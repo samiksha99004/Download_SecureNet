@@ -1,0 +1,7 @@
+/* SecureNet — TabShared: shared layout for all settings tab panels */
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}

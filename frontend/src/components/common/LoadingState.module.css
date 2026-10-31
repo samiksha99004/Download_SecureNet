@@ -1,0 +1,36 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-6);
+  gap: var(--space-3);
+}
+
+.inline {
+  flex-direction: row;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-2);
+}
+
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-peach-dark);
+  animation: spin 700ms linear infinite;
+  flex-shrink: 0;
+}
+
+.sm  { width: 16px; height: 16px; }
+.md  { width: 24px; height: 24px; }
+.lg  { width: 36px; height: 36px; }
+
+.message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

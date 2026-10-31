@@ -1,0 +1,99 @@
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-white);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  min-width: 800px;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+
+.th {
+  text-align: left;
+  padding: var(--space-3) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background-color: var(--color-peach-lightest);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.th:first-child { border-radius: var(--radius-lg) 0 0 0; }
+.th:last-child  { border-radius: 0 var(--radius-lg) 0 0; }
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.sortButton:hover { color: var(--color-text); }
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.sortIcon       { color: var(--color-border); }
+.sortIconActive { color: var(--color-peach-dark); }
+
+/* ── Rows ────────────────────────────────────────────────────── */
+
+.tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  outline: none;
+}
+
+.tr:hover     { background-color: var(--color-peach-lightest); }
+.tr:focus-visible { background-color: var(--color-peach-light); }
+
+.tr:not(:last-child) td { border-bottom: 1px solid var(--color-border); }
+
+.td {
+  padding: var(--space-3) var(--space-3);
+  color: var(--color-text);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Cell content ────────────────────────────────────────────── */
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.port {
+  color: var(--color-text-muted);
+}
+
+.normal {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.action {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}

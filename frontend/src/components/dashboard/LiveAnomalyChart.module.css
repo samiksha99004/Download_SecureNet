@@ -1,0 +1,102 @@
+.card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.liveScore {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+/* Chart container */
+.chartArea {
+  height: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Overlay messages (unavailable, waiting, etc.) */
+.overlayMessage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  width: 100%;
+  height: 100%;
+}
+
+.unavailableText {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.unavailableSubtext {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  max-width: 300px;
+}
+
+.waitingText {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+/* Recharts custom tooltip */
+.tooltip {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.tooltipTime {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.tooltipScore {
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+.tooltipValue {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}

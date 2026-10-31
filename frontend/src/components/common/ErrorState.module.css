@@ -1,0 +1,48 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.icon {
+  color: var(--color-severity-high);
+}
+
+.title {
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 320px;
+}
+
+.retryButton {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-peach-dark);
+  background: var(--color-peach-light);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.retryButton:hover {
+  background: var(--color-border);
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+}

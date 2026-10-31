@@ -1,0 +1,106 @@
+.card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.headerIcon { color: var(--color-peach-dark); flex-shrink: 0; }
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.hostname {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: var(--color-peach-lightest);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+}
+
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.metricBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.metricRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.metricIcon {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.metricLabel {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  flex: 1;
+}
+
+.metricValue {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.na {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Usage bar */
+.usageBarTrack {
+  height: 4px;
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-left: calc(16px + var(--space-2)); /* align with metric value */
+}
+
+.usageBarFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 600ms ease, background-color 300ms ease;
+}
+
+.noData {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-4) 0;
+}

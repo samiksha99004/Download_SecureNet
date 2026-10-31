@@ -1,0 +1,8 @@
+# Optional ML stack — install only when you want to load the trained
+# Isolation Forest and/or XGBoost models (ML_AUTOLOAD=true in .env).
+#   pip install -r requirements-ml.txt
+# Use the same scikit-learn / XGBoost versions the .pkl files were trained with.
+-r requirements.txt
+scikit-learn==1.9.1     # the version the hybrid model was trained with
+xgboost==3.4.1          # same
+joblib>=1.4

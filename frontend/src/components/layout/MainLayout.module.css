@@ -1,0 +1,47 @@
+/* ── Root: sidebar + body side-by-side ─────────────────────────── */
+
+.root {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: var(--color-peach-lightest);
+}
+
+/* ── Body: topbar stacked above scrollable content ─────────────── */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Scrollable main content area ──────────────────────────────── */
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-6);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .content {
+    padding: var(--space-5);
+  }
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: var(--space-3);
+  }
+}

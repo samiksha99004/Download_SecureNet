@@ -1,0 +1,47 @@
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-peach-lightest);
+  border: 1px solid var(--color-border);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+/* Dot variants */
+.dotIdle         { background-color: var(--color-border); }
+.dotConnecting   {
+  background-color: var(--color-severity-medium);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.dotConnected    {
+  background-color: var(--color-severity-low);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.dotDisconnected { background-color: var(--color-text-muted); }
+.dotError        { background-color: var(--color-severity-high); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* Hide label on very small screens, keep dot */
+@media (max-width: 480px) {
+  .label { display: none; }
+  .indicator { padding: 6px; }
+}

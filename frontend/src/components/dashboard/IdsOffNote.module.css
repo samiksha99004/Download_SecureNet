@@ -1,0 +1,14 @@
+.links {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.link {
+  color: var(--color-peach-dark);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

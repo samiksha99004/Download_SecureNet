@@ -1,0 +1,118 @@
+/* ── AuthLayout ───────────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  min-height: 100dvh;
+  background-color: var(--color-white);
+}
+
+/* ── Brand panel ──────────────────────────────────────────────── */
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 420px;
+  flex-shrink: 0;
+  background-color: var(--color-peach-lightest);
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-10) var(--space-8);
+}
+
+.brandInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-peach-dark);
+}
+
+.logoText {
+  font-family: var(--font-heading);
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  max-width: 320px;
+}
+
+.featureList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.featureList li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.featureList li::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-peach-accent);
+  flex-shrink: 0;
+}
+
+.brandFooter {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Form panel ───────────────────────────────────────────────── */
+
+.formPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  overflow-y: auto;
+}
+
+.formInner {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* ── Responsive: collapse brand panel on smaller screens ──────── */
+
+@media (max-width: 768px) {
+  .brand {
+    display: none;
+  }
+
+  .formPanel {
+    padding: var(--space-6) var(--space-4);
+    align-items: flex-start;
+    padding-top: var(--space-10);
+  }
+}
+
+.websiteLink {
+  color: var(--color-peach-dark);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+a.websiteLink:hover {
+  text-decoration: underline;
+}

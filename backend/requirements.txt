@@ -1,0 +1,43 @@
+# SecureNet backend — core runtime dependencies (Python 3.11 – 3.13)
+# ML libraries (scikit-learn / XGBoost) are optional and live in requirements-ml.txt;
+# the IDS runs without them (capture-only) until models are enabled.
+
+# FastAPI core
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12
+
+# Database
+sqlalchemy>=2.0.36,<2.1
+alembic>=1.14
+asyncpg>=0.30
+
+# Authentication & Security
+python-jose[cryptography]>=3.3
+passlib>=1.7.4
+bcrypt>=4.2
+python-dotenv>=1.0
+
+# Validation
+pydantic>=2.9,<3
+pydantic-settings>=2.6
+email-validator>=2.2
+
+# WebSocket
+websockets>=13
+
+# Numerics (flow statistics)
+numpy>=2.1
+
+# Network monitoring
+scapy>=2.6
+psutil>=6.1
+
+# Report generation
+reportlab>=4.2
+
+# Testing
+pytest>=8.3
+pytest-asyncio>=0.24
+httpx>=0.27
+aiosqlite>=0.20

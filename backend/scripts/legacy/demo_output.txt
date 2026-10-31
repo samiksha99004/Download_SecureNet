@@ -1,0 +1,360 @@
+﻿================================================================================
+SECURENET IDS - REAL-TIME DETECTION DEMO
+================================================================================
+
+[STARTUP] Loading trained ML models...
+2026-09-13 22:10:29,075 - securenet - INFO - Loading ML models from F:\all_10_csv_manual...
+python : --- Logging error ---
+At line:1 char:1
++ python demo_detection.py 2>&1 | Out-File -FilePath 
+demo_output.txt -E ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (--- Loggin 
+   g error ---:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 55, in load_models
+    logger.info(f"\u2713 Isolation Forest loaded")
+Message: '\u2713 Isolation Forest loaded'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 63, in load_models
+    logger.info(f"\u2713 Feature columns loaded: 
+{len(self.feature_columns)} features")
+Message: '\u2713 Feature columns loaded: 71 features'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 71, in load_models
+    logger.info(f"\u2713 XGBoost hybrid model loaded")
+Message: '\u2713 XGBoost hybrid model loaded'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 76, in load_models
+    logger.info(f"\u2713 XGBoost threshold loaded: 
+{self.xgboost_threshold}")
+Message: '\u2713 XGBoost threshold loaded: 0.3'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 83, in load_models
+    logger.info(f"\u2713 Hybrid feature columns loaded: 
+{len(self.hybrid_feature_columns)} features")
+Message: '\u2713 Hybrid feature columns loaded: 72 
+features'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 88, in load_models
+    logger.info(f"\u2713 XGBoost multiclass model 
+loaded")
+Message: '\u2713 XGBoost multiclass model loaded'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 96, in load_models
+    logger.info(f"\u2713 Label encoder loaded: 
+{len(attack_types)} classes")
+Message: '\u2713 Label encoder loaded: 14 classes'
+Arguments: ()
+2026-09-13 22:10:31,102 - securenet - INFO -   Attack types: ['Benign', 'Bot', 'Brute Force -Web', 'Brute Force -XSS', 'DDOS attack-HOIC', 'DDOS attack-LOIC-UDP', 'DDoS attacks-LOIC-HTTP', 'DoS attacks-GoldenEye', 'DoS attacks-Hulk', 'DoS attacks-SlowHTTPTest', 'DoS attacks-Slowloris', 'FTP-BruteForce', 'SQL Injection', 'SSH-Bruteforce']
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 104, in load_models
+    logger.info(f"\u2713 Scaler loaded")
+Message: '\u2713 Scaler loaded'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Program 
+Files\Python314\Lib\logging\__init__.py", line 1154, in 
+emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2713' in position 45: character maps to 
+<undefined>
+Call stack:
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 20, in demo_detection
+    initialize_ml_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 277, in initialize_ml_models
+    return ml_models.load_models()
+  File "F:\SecureNet (3)\backend\app\ml\models.py", 
+line 109, in load_models
+    logger.info("\u2713 ML models loaded successfully")
+Message: '\u2713 ML models loaded successfully'
+Arguments: ()
+C:\Users\Lenovo\AppData\Roaming\Python\Python314\site-pa
+ckages\sklearn\utils\validation.py:2749: UserWarning: X 
+does not have valid feature names, but IsolationForest 
+was fitted with feature names
+  warnings.warn(
+[Parallel(n_jobs=1)]: Done  49 tasks      | elapsed:    
+0.0s
+[Parallel(n_jobs=1)]: Done 100 out of 100 | elapsed:    
+0.0s finished
+C:\Users\Lenovo\AppData\Roaming\Python\Python314\site-pa
+ckages\sklearn\utils\validation.py:2749: UserWarning: X 
+does not have valid feature names, but IsolationForest 
+was fitted with feature names
+  warnings.warn(
+[Parallel(n_jobs=1)]: Done  49 tasks      | elapsed:    
+0.0s
+[Parallel(n_jobs=1)]: Done 100 out of 100 | elapsed:    
+0.0s finished
+OK Models loaded successfully
+   - Isolation Forest: 71 features
+   - Attack types: 13 classes
+
+================================================================================
+ANALYZING: Normal Web Browsing
+================================================================================
+
+[STAGE 1] Isolation Forest - Anomaly Detection
+  Anomaly Score: 0.1558
+  Is Anomaly: False
+  Status: NORMAL
+Traceback (most recent call last):
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 118, in <module>
+    demo_detection()
+    ~~~~~~~~~~~~~~^^
+  File "F:\SecureNet (3)\backend\demo_detection.py", 
+line 50, in demo_detection
+    print(f"  \u2192 RESULT: Normal traffic - no 
+further action")
+    
+~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\Python314\Lib\encodings\cp1252.py", line 19, in 
+encode
+    return codecs.charmap_encode(input,self.errors,encod
+ing_table)[0]
+           
+~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode 
+character '\u2192' in position 2: character maps to 
+<undefined>

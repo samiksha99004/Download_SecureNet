@@ -1,0 +1,119 @@
+/* SecureNet — SettingsField */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.labelGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+.label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+  line-height: 1.4;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Toggle ─────────────────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-border);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-base);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.toggleOn {
+  background-color: var(--color-peach-dark);
+}
+
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base);
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────── */
+.input,
+.inputNumber,
+.select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background-color: var(--color-white);
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus,
+.inputNumber:focus,
+.select:focus {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+  border-color: var(--color-peach-accent);
+}
+
+.input:disabled,
+.inputNumber:disabled,
+.select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--color-surface);
+}
+
+.input {
+  min-width: 260px;
+}
+
+.inputNumber {
+  width: 100px;
+}
+
+.select {
+  min-width: 160px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a6d65' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}

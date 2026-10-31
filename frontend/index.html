@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a1020" />
+    <meta name="color-scheme" content="dark light" />
+    <script>
+      /* saved theme (Settings -> Preferences) before first paint */
+      try { if (localStorage.getItem('sn_theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+    </script>
+    <title>SecureNet — Behavioural Intrusion Detection System</title>
+    <!-- Web fonts load without blocking the first paint (offline / blocked
+         Google Fonts must never leave the page blank; system fonts are used). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <style>
+      html { background: #0a1020; color-scheme: dark; }
+      html[data-theme="light"] { background: #fbeee4; color-scheme: light; }
+      html[data-theme="light"] #boot { color: #5a4035; }
+      html[data-theme="light"] #boot .title { color: #3d2b22; }
+      html[data-theme="light"] #boot pre { background: #fffaf6; border-color: #efd6c6; color: #c0392b; }
+      #boot { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+              padding: 24px; font: 15px/1.5 system-ui, 'Segoe UI', sans-serif; color: #cbd5e1; }
+      #boot .box { max-width: 560px; text-align: center; }
+      #boot .title { font-size: 20px; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
+      #boot pre { text-align: left; white-space: pre-wrap; word-break: break-word; margin-top: 16px;
+                  padding: 12px; font: 13px/1.4 Consolas, monospace; color: #f87171;
+                  background: #111a2b; border: 1px solid #22304a; border-radius: 8px; }
+      #boot button { margin-top: 16px; padding: 8px 16px; font-weight: 600; color: #04111f;
+                     background: #38bdf8; border: 0; border-radius: 8px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <!-- Replaced by React on mount. Stays visible (with the reason) if the app cannot start. -->
+    <div id="root">
+      <div id="boot">
+        <div class="box">
+          <div class="title">Starting SecureNet…</div>
+          <div id="boot-msg">Loading the dashboard.</div>
+        </div>
+      </div>
+    </div>
+    <noscript>
+      <p style="color:#e2e8f0;text-align:center;font-family:system-ui">SecureNet needs JavaScript enabled.</p>
+    </noscript>
+    <script>
+      (function () {
+        var errors = [];
+        function show(reason) {
+          var boot = document.getElementById('boot');
+          if (!boot) return; // React has mounted — the in-app error screen handles it
+          // First start after installing: the dev server may still be preparing
+          // dependencies, so retry once automatically before reporting a failure.
+          try {
+            if (!sessionStorage.getItem('sn_boot_retry')) {
+              sessionStorage.setItem('sn_boot_retry', '1');
+              setTimeout(function () { location.reload(); }, 1500);
+              return;
+            }
+          } catch (e) { /* storage blocked: just report */ }
+          boot.innerHTML =
+            '<div class="box"><div class="title">SecureNet could not start</div>' +
+            '<div>Make sure the frontend and backend windows are still running, then reload.</div>' +
+            (reason ? '<pre></pre>' : '') +
+            '<button type="button" onclick="location.reload()">Reload</button></div>';
+          if (reason) boot.querySelector('pre').textContent = reason;
+        }
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          // only failed scripts matter here; fonts/images failing is harmless
+          if (t && t !== window && t.tagName !== 'SCRIPT') return;
+          errors.push(e.message || (e.target && (e.target.src || e.target.href)) || 'Script error');
+          show(errors.join('\n'));
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          if (!document.getElementById('boot')) return;
+          errors.push(String((r && r.message) || r));
+          show(errors.join('\n'));
+        });
+        setTimeout(function () {
+          if (document.getElementById('boot')) show(errors.join('\n') || 'The app did not finish loading within 15 seconds.');
+        }, 15000);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

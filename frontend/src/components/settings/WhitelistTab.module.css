@@ -1,0 +1,188 @@
+/* SecureNet — WhitelistTab */
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Top row ────────────────────────────────────────────────────── */
+.topRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.subheading {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-peach-dark);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-white);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.addBtn:hover {
+  background-color: var(--color-peach-accent);
+}
+
+.addBtnEmpty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--color-peach-dark);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-white);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.addBtnEmpty:hover {
+  background-color: var(--color-peach-accent);
+}
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.tableWrapper {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--color-peach-lightest);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color var(--transition-fast);
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background-color: var(--color-peach-lightest);
+}
+
+.td {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.tdMono {
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.tdAction {
+  padding: var(--space-2) var(--space-4);
+  text-align: right;
+  vertical-align: middle;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* ── Type badge ─────────────────────────────────────────────────── */
+.typeBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--color-peach-light);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-peach-dark);
+  white-space: nowrap;
+}
+
+/* ── Status badges ──────────────────────────────────────────────── */
+.activeBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--tint-low-bg);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-severity-low);
+}
+
+.inactiveBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+/* ── Delete button ──────────────────────────────────────────────── */
+.deleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.deleteBtn:hover {
+  background-color: var(--tint-high-bg);
+  color: var(--color-severity-high);
+}

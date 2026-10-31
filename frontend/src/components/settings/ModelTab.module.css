@@ -1,0 +1,224 @@
+/* SecureNet — ModelTab */
+
+/* ── Stage card ─────────────────────────────────────────────────── */
+.stageCard {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.stageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.stageTitle {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stageSubtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ── Status pill ────────────────────────────────────────────────── */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.statusLoaded    { background-color: var(--tint-low-bg); color: var(--color-severity-low);    }
+.statusLoading   { background-color: var(--color-peach-light); color: var(--color-peach-dark); }
+.statusError     { background-color: var(--tint-high-bg); color: var(--color-severity-high);   }
+.statusNotLoaded { background-color: var(--color-surface); color: var(--color-text-muted); }
+
+/* ── Feature statement ──────────────────────────────────────────── */
+.featureStatement {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-peach-lightest);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-peach-accent);
+}
+
+/* ── Info grid ──────────────────────────────────────────────────── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+}
+
+.infoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.infoLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.infoValue {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.infoValueMono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+/* ── Metrics block ──────────────────────────────────────────────── */
+.metricsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.metricsTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metricsTitleSpaced {
+  margin-top: var(--space-4);
+}
+
+.metricsUnavailable {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ── Attack class pills ─────────────────────────────────────────── */
+.classesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.classPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.classPill {
+  padding: 2px 10px;
+  background-color: var(--color-peach-light);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-peach-dark);
+}
+
+/* ── Per-class table ────────────────────────────────────────────── */
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.perClassTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.pth {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  background-color: var(--color-peach-lightest);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ptr {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ptr:last-child {
+  border-bottom: none;
+}
+
+.ptd {
+  padding: var(--space-2) var(--space-3);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.ptdNum {
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+/* ── Pipeline note / refresh ────────────────────────────────────── */
+.pipelineNote {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.refreshedAt {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .infoGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reloadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-on-accent);
+  background: var(--color-peach-dark);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.reloadButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}

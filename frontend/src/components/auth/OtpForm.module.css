@@ -1,0 +1,159 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Backend notice */
+.notice {
+  background-color: var(--tint-info-bg);
+  border: 1px solid var(--tint-info-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--color-severity-info);
+}
+
+.errorBanner {
+  background-color: var(--tint-high-bg);
+  border: 1px solid var(--tint-high-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-severity-high);
+}
+
+.successBanner {
+  background-color: var(--tint-low-bg);
+  border: 1px solid var(--tint-low-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-severity-low);
+}
+
+/* ── OTP digits ─────────────────────────────────────────────── */
+
+.otpRow {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.otpInput {
+  width: 52px;
+  height: 56px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background-color: var(--color-white);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  caret-color: var(--color-peach-dark);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.otpInput:focus {
+  border-color: var(--color-peach-accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.otpInput:not(:placeholder-shown):not(:focus) {
+  border-color: var(--color-peach-dark);
+  background-color: var(--color-peach-lightest);
+}
+
+.otpInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Resend ───────────────────────────────────────────────────── */
+
+.resendRow {
+  text-align: center;
+}
+
+.resendText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.countdown {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.resendButton {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-peach-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.resendButton:hover {
+  color: var(--color-peach-accent);
+}
+
+.resendButton:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Back link ────────────────────────────────────────────────── */
+
+.backLink {
+  text-align: center;
+}
+
+.link {
+  font-size: 0.875rem;
+  color: var(--color-peach-dark);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 400px) {
+  .otpInput {
+    width: 42px;
+    height: 48px;
+    font-size: 1.125rem;
+  }
+}

@@ -1,0 +1,89 @@
+/* SecureNet — ProfileCard */
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+/* ── Avatar ──────────────────────────────────────────────────────── */
+.avatarWrap {
+  flex-shrink: 0;
+}
+
+.avatarImg {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-border);
+}
+
+.avatarInitials {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: var(--color-peach-light);
+  color: var(--color-peach-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 1.375rem;
+  font-weight: 700;
+  border: 2px solid var(--color-peach-accent);
+  user-select: none;
+}
+
+/* ── Info ────────────────────────────────────────────────────────── */
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.name {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.email {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.roleBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  background-color: var(--color-peach-light);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-peach-dark);
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.statusActive    { background-color: var(--tint-low-bg); color: var(--color-severity-low); }
+.statusSuspended { background-color: var(--tint-high-bg); color: var(--color-severity-high); }
+.statusPending   { background-color: var(--color-peach-light); color: var(--color-peach-dark); }
+
+@media (max-width: 480px) {
+  .card { flex-direction: column; align-items: flex-start; }
+}

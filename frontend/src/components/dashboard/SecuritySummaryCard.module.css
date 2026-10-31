@@ -1,0 +1,113 @@
+.card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.sectionLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* Severity bars */
+.severityList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.severityRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.severityMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.severityLabel {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.severityCount {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.barTrack {
+  height: 6px;
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 600ms ease;
+  min-width: 2px;
+}
+
+/* Attack list */
+.attackList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.attackItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-peach-lightest);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.attackType {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.attackCount {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.noData {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}

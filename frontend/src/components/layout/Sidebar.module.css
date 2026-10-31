@@ -1,0 +1,330 @@
+/* ── Desktop wrapper ──────────────────────────────────────────── */
+
+.desktopWrapper {
+  height: 100%;
+  flex-shrink: 0;
+}
+
+/* ── Core sidebar shell ───────────────────────────────────────── */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  height: 100%;
+  background-color: var(--color-white);
+  border-right: 1px solid var(--color-border);
+  transition: width var(--transition-slow);
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* ── Logo row ─────────────────────────────────────────────────── */
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-3) var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  min-height: var(--topbar-height);
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.logoIcon {
+  color: var(--color-peach-dark);
+  flex-shrink: 0;
+}
+
+.logoText {
+  font-family: var(--font-heading);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+/* Collapse toggle button (desktop) */
+.collapseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.collapseButton:hover {
+  background-color: var(--color-peach-lightest);
+  color: var(--color-text);
+}
+
+.collapseButton:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+}
+
+/* Mobile close (only visible inside mobile drawer) */
+.mobileClose {
+  display: none;
+}
+
+/* ── Navigation ───────────────────────────────────────────────── */
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-3) var(--space-2);
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  white-space: nowrap;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  min-height: 40px;
+}
+
+.navLink:hover {
+  background-color: var(--color-peach-lightest);
+  color: var(--color-text);
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 1px;
+}
+
+.navLinkActive {
+  background-color: var(--color-peach-light);
+  color: var(--color-peach-dark);
+  font-weight: 500;
+}
+
+.navLinkActive:hover {
+  background-color: var(--color-peach-light);
+  color: var(--color-peach-dark);
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.navLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed — centre icons */
+.collapsed .navLink {
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+.collapsed .logoRow {
+  justify-content: center;
+  padding: var(--space-4) var(--space-2);
+}
+
+.collapsed .collapseButton {
+  display: none;
+}
+
+/* ── Bottom section ───────────────────────────────────────────── */
+
+.bottom {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.userSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--color-peach-lightest);
+  min-width: 0;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-peach-light);
+  color: var(--color-peach-dark);
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.userName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userRole {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  min-height: 40px;
+}
+
+.logoutButton:hover {
+  background-color: var(--tint-high-bg);
+  color: var(--color-severity-high);
+}
+
+.logoutButton:focus-visible {
+  outline: 2px solid var(--color-peach-dark);
+  outline-offset: 2px;
+}
+
+.logoutIcon {
+  flex-shrink: 0;
+}
+
+.collapsed .logoutButton {
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+/* ── Mobile overlay ───────────────────────────────────────────── */
+
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: var(--overlay);
+  z-index: 40;
+}
+
+.mobileDrawer {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100dvh;
+  z-index: 50;
+  transform: translateX(-100%);
+  transition: transform var(--transition-slow);
+}
+
+.mobileDrawerOpen {
+  transform: translateX(0);
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .desktopWrapper {
+    display: none;
+  }
+
+  .overlay {
+    display: block;
+  }
+
+  .mobileDrawer {
+    display: block;
+  }
+
+  .mobileClose {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+
+  .mobileClose:hover {
+    background-color: var(--color-peach-lightest);
+    color: var(--color-text);
+  }
+
+  .collapseButton {
+    display: none;
+  }
+}

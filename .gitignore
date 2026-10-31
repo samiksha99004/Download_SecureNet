@@ -1,0 +1,37 @@
+# ── Secrets — NEVER commit ──────────────────────────────────────────
+.env
+backend/.env
+frontend/.env.local
+*.neon-backup
+*.key
+*.pem
+
+# ── Python ──────────────────────────────────────────────────────────
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ── Node / frontend ─────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+desktop/node_modules/
+
+# ── Runtime data / logs / local DB ──────────────────────────────────
+backend/logs/
+backend/data/
+backend/reports/
+*.log
+*.db
+desktop/userdata/
+
+# ── Live capture working files ──────────────────────────────────────
+live_ids/pcap/
+live_ids/csv/
+live_ids/results/
+live_ids/*.pcap
+
+# ── OS ──────────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store

@@ -1,0 +1,85 @@
+.statusBox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+}
+
+.ok {
+  color: var(--color-severity-low);
+  background: var(--tint-low-bg);
+  border-color: var(--tint-low-border);
+}
+
+.warn {
+  color: var(--color-severity-medium);
+  background: var(--tint-medium-bg);
+  border-color: var(--tint-medium-border);
+}
+
+.statusBox > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.statusText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+}
+
+.statusText strong {
+  color: var(--color-text);
+}
+
+.statusText code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  padding: 0 4px;
+  background: var(--color-peach-lightest);
+  border-radius: var(--radius-sm);
+}
+
+.testButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--color-on-accent);
+  background: var(--color-peach-dark);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.testButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.recipients {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.recipients svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+@media (max-width: 640px) {
+  .statusBox {
+    flex-wrap: wrap;
+  }
+}
