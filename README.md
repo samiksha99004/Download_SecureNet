@@ -1,7 +1,7 @@
 # SecureNet — Network Intrusion Detection System (IDS)
 
 SecureNet is a live network intrusion detection system. It captures your computer's network
-traffic, scores each flow with a trained machine-learning model (XGBoost), and shows the result
+traffic, scores each flow with a hybrid **Isolation Forest + XGBoost** model, and shows the result
 on a web dashboard — **NORMAL** or **ABNORMAL (attack detected)** — with per-attack details,
 desktop/email alerts, reports, and an optional **Advanced Protection** mode that blocks an
 attacker's IP at the Windows Firewall.
