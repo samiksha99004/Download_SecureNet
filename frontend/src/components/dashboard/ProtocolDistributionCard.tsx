@@ -122,15 +122,6 @@ export function ProtocolDistributionCard({
               </PieChart>
             </ResponsiveContainer>
           </div>
-
-          {data && (
-            <p className={styles.totalFlows}>
-              Total flows:{' '}
-              <span className={styles.totalValue}>
-                {data.totalFlows.toLocaleString()}
-              </span>
-            </p>
-          )}
         </>
       )}
     </div>
