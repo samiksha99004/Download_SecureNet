@@ -155,8 +155,8 @@ export function DashboardPage() {
           aria-label="Key security metrics"
         >
           <KPICard
-            title="Active Flows"
-            value={kpiValue(s ? formatNumber(s.activeFlows) : null)}
+            title="Incidents Today"
+            value={kpiValue(idsStatus.data ? formatNumber(idsStatus.data.abnormalEventsToday ?? 0) : null)}
             icon={<Activity size={16} />}
             accent="info"
             isLoading={kpiLoading}

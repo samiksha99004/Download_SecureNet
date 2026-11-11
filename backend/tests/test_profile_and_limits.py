@@ -4,18 +4,18 @@ per-network-address limits (issue #7)."""
 from tests.conftest import register
 
 
-async def signed_in(client, captured_otps, email, name="Asha Rao", phone="+919876543210", password="GoodPass1"):
-    auth = await register(client, captured_otps, email=email, name=name, phone=phone, password=password)
+async def signed_in(client, captured_otps, email, name="Asha Rao", password="GoodPass1"):
+    auth = await register(client, captured_otps, email=email, name=name, password=password)
     return {"Authorization": f"Bearer {auth['tokens']['accessToken']}"}
 
 
 # ── Profile changes ──────────────────────────────────────────────────────────
 
-async def test_change_name_and_phone_needs_the_emailed_code(client, captured_otps):
+async def test_change_name_needs_the_emailed_code(client, captured_otps):
     headers = await signed_in(client, captured_otps, "asha@example.com")
     captured_otps.clear()
     r = await client.post("/api/auth/profile/change", headers=headers,
-                          json={"fullName": "Asha R. Rao", "phoneNumber": "+91 90000 22222"})
+                          json={"fullName": "Asha R. Rao"})
     assert r.status_code == 200, r.text
     started = r.json()
     assert started["sentTo"] == "as**@example.com" and "6-digit code" in started["message"]
@@ -23,7 +23,7 @@ async def test_change_name_and_phone_needs_the_emailed_code(client, captured_otp
 
     # nothing changes before the code is entered
     me = (await client.get("/api/auth/me", headers=headers)).json()
-    assert me["fullName"] == "Asha Rao" and me["phoneNumber"] == "+919876543210"
+    assert me["fullName"] == "Asha Rao"
 
     code = captured_otps["asha@example.com"]
     wrong = "000000" if code != "000000" else "111111"
@@ -34,7 +34,7 @@ async def test_change_name_and_phone_needs_the_emailed_code(client, captured_otp
     r = await client.post("/api/auth/profile/confirm", headers=headers,
                           json={"changeToken": started["changeToken"], "otp": code})
     assert r.status_code == 200, r.text
-    assert r.json()["fullName"] == "Asha R. Rao" and r.json()["phoneNumber"] == "+919000022222"
+    assert r.json()["fullName"] == "Asha R. Rao"
 
     # the same code / token cannot be used again
     r = await client.post("/api/auth/profile/confirm", headers=headers,
@@ -71,8 +71,6 @@ async def test_profile_change_rules(client, captured_otps):
     assert r.status_code == 400 and "Nothing to change" in r.json()["message"]
     r = await client.post("/api/auth/profile/change", headers=headers, json={"email": "taken@example.com"})
     assert r.status_code == 400 and "already used" in r.json()["message"]
-    r = await client.post("/api/auth/profile/change", headers=headers, json={"phoneNumber": "12ab"})
-    assert r.status_code == 422
     r = await client.post("/api/auth/profile/change", headers=headers, json={"fullName": "A"})
     assert r.status_code == 422
     assert (await client.post("/api/auth/profile/change", json={"fullName": "Someone"})).status_code == 401
@@ -102,17 +100,15 @@ async def test_failed_sign_ins_are_limited_per_network_address(client, captured_
 
 async def test_code_emails_are_limited_per_network_address(client, captured_otps):
     for i in range(15):
-        r = await client.post("/api/auth/signup", json={"fullName": "Spam Bot", "email": f"s{i}@example.com",
-                                                        "phoneNumber": "9876543210"})
+        r = await client.post("/api/auth/signup", json={"fullName": "Spam Bot", "email": f"s{i}@example.com"})
         assert r.status_code == 200, (i, r.text)
-    r = await client.post("/api/auth/signup", json={"fullName": "Spam Bot", "email": "s99@example.com",
-                                                    "phoneNumber": "9876543210"})
+    r = await client.post("/api/auth/signup", json={"fullName": "Spam Bot", "email": "s99@example.com"})
     assert r.status_code == 429 and "verification emails" in r.json()["message"]
 
 
 async def test_wrong_codes_are_limited_per_network_address(client, captured_otps, monkeypatch):
     monkeypatch.setattr("app.core.config.settings.OTP_MAX_ATTEMPTS", 1000)   # isolate the network limit
-    await client.post("/api/auth/signup", json={"fullName": "Guess Er", "email": "g@example.com", "phoneNumber": "9876543210"})
+    await client.post("/api/auth/signup", json={"fullName": "Guess Er", "email": "g@example.com"})
     right = captured_otps["g@example.com"]
     wrong = "000000" if right != "000000" else "111111"
     for _ in range(30):

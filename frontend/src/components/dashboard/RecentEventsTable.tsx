@@ -16,6 +16,7 @@ import { SeverityBadge } from '../common/SeverityBadge';
 import { EmptyState } from '../common/EmptyState';
 import { IdsOffNote } from './IdsOffNote';
 import { LoadingState } from '../common/LoadingState';
+import { prettyLabel } from '../../utils/verdict';
 import styles from './RecentEventsTable.module.css';
 
 interface RecentEventsTableProps {
@@ -125,7 +126,7 @@ export function RecentEventsTable({ events, isLoading, idsOff = false }: RecentE
                     <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{g.spanLabel}</div>
                   </td>
                   <td className={styles.td}><b>{g.count}</b></td>
-                  <td className={styles.td}>{summarise(g.types, (t) => `${t.label} ×${t.n}`)}</td>
+                  <td className={styles.td}>{summarise(g.types, (t) => `${prettyLabel(t.label)} ×${t.n}`)}</td>
                   <td className={styles.td}><span className={styles.mono}>{summarise(g.sources, (s) => s)}</span></td>
                   <td className={styles.td}><SeverityBadge severity={g.severity} /></td>
                 </tr>

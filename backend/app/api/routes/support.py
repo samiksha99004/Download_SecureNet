@@ -85,11 +85,10 @@ async def _check_rate(db: AsyncSession, user: User) -> None:
 
 def _render(user: User, subject: str, message: str, for_admin: bool) -> tuple[str, str]:
     who = f"{user.full_name} <{user.email}>"
-    phone = user.phone_number or "-"
     intro = ("A SecureNet user sent a message from the Support page. Reply to this email to answer them."
              if for_admin else
              "Thank you for contacting SecureNet. This is a copy of your message; the team will reply to this email address.")
-    text = (f"{intro}\n\nFrom: {who}\nPhone: {phone}\nSubject: {subject}\n\n{message}\n")
+    text = (f"{intro}\n\nFrom: {who}\nSubject: {subject}\n\n{message}\n")
     esc = html.escape
     body = f"""<html><body style="margin:0;background:#fbeee4;font-family:Arial,Helvetica,sans-serif">
   <div style="max-width:640px;margin:0 auto;padding:24px">
@@ -98,7 +97,6 @@ def _render(user: User, subject: str, message: str, for_admin: bool) -> tuple[st
       <p style="margin:0 0 16px;color:#5a4035">{esc(intro)}</p>
       <table style="font-size:14px;margin-bottom:16px">
         <tr><td style="color:#7d6154;padding:2px 12px 2px 0">From</td><td>{esc(who)}</td></tr>
-        <tr><td style="color:#7d6154;padding:2px 12px 2px 0">Phone</td><td>{esc(phone)}</td></tr>
         <tr><td style="color:#7d6154;padding:2px 12px 2px 0">Subject</td><td><b>{esc(subject)}</b></td></tr>
       </table>
       <div style="white-space:pre-wrap;font-size:14px;line-height:1.5;border-top:1px solid #efd6c6;padding-top:12px">{esc(message)}</div>

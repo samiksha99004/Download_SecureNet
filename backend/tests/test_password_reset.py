@@ -44,8 +44,7 @@ async def test_forgot_password_unknown_email_is_generic_and_sends_nothing(client
 
 
 async def test_signup_code_cannot_reset_password_of_pending_account(client, captured_otps):
-    await client.post("/api/auth/signup", json={"fullName": "Pen Ding", "email": "pending@example.com",
-                                                "phoneNumber": "9876543210"})
+    await client.post("/api/auth/signup", json={"fullName": "Pen Ding", "email": "pending@example.com"})
     r = await client.post("/api/auth/password/verify",
                           json={"email": "pending@example.com", "otp": captured_otps["pending@example.com"]})
     assert r.status_code == 400

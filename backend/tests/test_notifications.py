@@ -12,10 +12,16 @@ from app.utils.timeutil import utcnow
 from tests.conftest import register
 
 
-async def make_event(severity=SeverityLevel.HIGH, action=ActionTaken.ALERTED, attack="DDoS") -> SecurityEvent:
+async def make_event(severity=SeverityLevel.HIGH, action=ActionTaken.ALERTED, attack="DDoS",
+                     src="203.0.113.7", owner=None) -> SecurityEvent:
+    import uuid as _uuid
+    from app.ml.ids_service import get_ids_service
+    if owner is None:                                   # default: the account that is "logged in"
+        oid = get_ids_service().active_owner_id
+        owner = _uuid.UUID(oid) if oid else None
     async with AsyncSessionLocal() as db:
         event = SecurityEvent(
-            timestamp=utcnow(), source_ip="203.0.113.7", source_port=50000,
+            timestamp=utcnow(), owner_id=owner, source_ip=src, source_port=50000,
             destination_ip="192.168.1.5", destination_port=80, protocol=Protocol.TCP,
             anomaly_score=0.9, severity=severity, attack_type=attack, confidence=0.95,
             mode=DetectionMode.PROTECT, state=EventState.ACTIVE, action_taken=action,
@@ -47,10 +53,12 @@ def sent(monkeypatch):
     return mails
 
 
-async def test_alerts_are_batched_to_all_registered_users(client, captured_otps, sent):
-    """Alerts go from the admin's Gmail to every SecureNet user; the admin gets none."""
+async def test_alerts_go_to_the_event_owner(client, captured_otps, sent):
+    """Per-account: an attack email goes to the account that owns the events (the user who was
+    logged in when they were detected), plus the optional extra address — not to other accounts.
+    `analyst` registers last, so they are the active owner here."""
     await register(client, captured_otps, email="admin@example.com", name="Owner Admin")       # first = admin
-    await register(client, captured_otps, email="analyst@example.com", name="Asha Rao", phone="+919000000001")
+    await register(client, captured_otps, email="analyst@example.com", name="Asha Rao")         # active owner
     await set_prefs(email_enabled=True, email_address="soc@example.com",
                     alert_on_high=True, alert_on_medium=False, alert_on_low=False, alert_on_block=True)
 
@@ -60,33 +68,32 @@ async def test_alerts_are_batched_to_all_registered_users(client, captured_otps,
     notifier.enqueue(await make_event(SeverityLevel.LOW, ActionTaken.BLOCKED, "SSH-Bruteforce"))  # blocked -> kept
     assert await notifier.flush() == 2
 
-    # one email: every non-admin registered user + the extra address — never the admin
+    # one email: the owner (analyst) + the extra address — NOT the admin / other accounts
     assert len(sent) == 1
     [mail] = sent
     assert mail["to"] == ["analyst@example.com", "soc@example.com"]
-    assert all("admin@example.com" not in m["to"] for m in sent)
-    assert mail["subject"].startswith("[SecureNet] Abnormal traffic detected - most likely ")
-    assert "(2 alerts)" in mail["subject"]
+    assert "admin@example.com" not in mail["to"]
+    assert mail["subject"].startswith("[SecureNet] Abnormal network found")
     assert not mail["subject"].startswith("[SecureNet Admin]")
-    assert "2 alerts" in mail["html"] and "Bot" not in mail["text"]
-    assert "full report is attached" in mail["text"]
-    assert "+919000000001" not in mail["text"]          # users don't see other users' details
+    assert "Bot" not in mail["text"]                    # the filtered-out medium alert
+    assert "report is attached" in mail["text"]
 
     [report] = mail["attachments"]
     assert report.filename.startswith("SecureNet-incident-report-") and report.filename.endswith(".txt")
     body = report.content.decode("utf-8")
-    assert "Abnormal traffic : 2 incident(s)" in body and "DDoS" in body and "SSH-Bruteforce" in body and "Bot" not in body
+    assert "Flagged flows    : 2" in body and "DDoS" in body and "SSH-Bruteforce" in body and "Bot" not in body
 
 
-async def test_admin_never_gets_attack_emails(client, captured_otps, sent):
-    """Only an admin registered (or the extra address is the admin's): nobody to email."""
+async def test_admin_also_gets_attack_emails(client, captured_otps, sent):
+    """The admin now receives attack emails too (owner's request). Only the admin registered:
+    the one email goes to the admin."""
     await register(client, captured_otps, email="admin@example.com")
     await set_prefs(email_enabled=True, email_address="ADMIN@example.com",
                     alert_on_high=True, alert_on_medium=True, alert_on_low=True)
     notifier = AlertNotifier()
     notifier.enqueue(await make_event(SeverityLevel.HIGH, attack="DDoS"))
-    assert await notifier.flush() == 0
-    assert sent == []
+    assert await notifier.flush() == 1
+    assert sent[0]["to"] == ["admin@example.com"]
 
 
 async def test_every_attack_is_emailed_by_default(client, captured_otps, sent):
@@ -97,7 +104,7 @@ async def test_every_attack_is_emailed_by_default(client, captured_otps, sent):
     for severity in (SeverityLevel.HIGH, SeverityLevel.MEDIUM, SeverityLevel.LOW):
         notifier.enqueue(await make_event(severity, attack=f"Attack-{severity.value}"))
     assert await notifier.flush() == 3
-    assert "Abnormal traffic : 3 incident(s)" in sent[0]["attachments"][0].content.decode("utf-8")
+    assert "Flagged flows    : 3" in sent[0]["attachments"][0].content.decode("utf-8")
 
 
 async def test_no_email_when_alerts_disabled(client, captured_otps, sent):
@@ -114,7 +121,8 @@ async def test_html_is_escaped(client, captured_otps, sent):
     await register(client, captured_otps, email="user@example.com")
     await set_prefs(email_enabled=True, alert_on_high=True)
     notifier = AlertNotifier()
-    notifier.enqueue(await make_event(attack="<script>x</script>"))
+    # the source address is shown in the email body ("Involving …"); it must be HTML-escaped
+    notifier.enqueue(await make_event(attack="DDoS", src="<script>x</script>"))
     await notifier.flush()
     assert "<script>" not in sent[0]["html"] and "&lt;script&gt;" in sent[0]["html"]
 
@@ -129,6 +137,9 @@ async def test_ids_alert_is_queued_for_email(monkeypatch):
                         lambda: type("N", (), {"enqueue": staticmethod(queued.append)})())
     ids = IDSService()
     ids.detector = FakeDetector(Detection(0.95, True, "DDoS", 0.99))
+    # An alert is stored (and queued for email) only for the abnormal window's majority attack.
+    ids._abnormal_now = True
+    ids._majority_attack = "DDoS"
     event = await ids.process_flow(make_flow())
     assert queued == [event]
 
@@ -146,7 +157,7 @@ async def test_notification_feed_and_status(client, admin):
     status = r.json()
     assert status["emailDelivery"] == "disabled"          # EMAIL_ENABLED=false in tests
     assert status["emailAlertsEnabled"] is True
-    assert status["recipients"] == ["extra@example.com"]          # never the admin
+    assert status["recipients"] == ["admin@example.com", "extra@example.com"]   # incl. the admin now
 
 
 async def test_test_email_endpoint(client, admin, monkeypatch):
@@ -195,7 +206,7 @@ async def test_attack_emails_are_spaced_five_minutes_apart(client, captured_otps
     notifier.enqueue(await make_event(SeverityLevel.HIGH, attack="DDoS"))
     assert notifier.seconds_until_next_email() == settings.ALERT_EMAIL_BATCH_SECONDS
     assert await notifier.flush() == 1
-    assert sent[-1]["subject"].startswith("[SecureNet] Abnormal traffic detected")
+    assert sent[-1]["subject"].startswith("[SecureNet] Abnormal network found")
 
     # still abnormal a few seconds later: many alerts wait for ONE email 5 min after the last
     for _ in range(20):
@@ -205,15 +216,15 @@ async def test_attack_emails_are_spaced_five_minutes_apart(client, captured_otps
     clock.t = 1000.0 + interval
     assert notifier.seconds_until_next_email() == 0
     assert await notifier.flush() == 20
-    assert len(sent) == 2 and "Abnormal traffic continues - 20 alerts" in sent[-1]["subject"]
-    assert "still detecting abnormal traffic" in sent[-1]["text"]
+    assert len(sent) == 2 and sent[-1]["subject"].startswith("[SecureNet] Abnormal network found")
+    assert "still seeing abnormal activity" in sent[-1]["text"]      # the "continuing" wording
 
     # 5 quiet minutes = normal again; the next alert is a new episode
     clock.t += interval + 1
     notifier.enqueue(await make_event(SeverityLevel.MEDIUM, attack="Bot"))
     assert notifier.seconds_until_next_email() == settings.ALERT_EMAIL_BATCH_SECONDS
     assert await notifier.flush() == 1
-    assert "Abnormal traffic detected" in sent[-1]["subject"]
+    assert "Abnormal network found" in sent[-1]["subject"]
 
 
 async def test_alert_email_is_short_and_carries_the_printable_report(client, captured_otps, sent):
@@ -227,14 +238,13 @@ async def test_alert_email_is_short_and_carries_the_printable_report(client, cap
     assert await notifier.flush() == 30
     [mail] = sent
     text = mail["text"]
-    assert "Most likely attack : DDoS (in 25 of 30 alerts)" in text
-    assert "30 alerts (20 high · 10 medium)" in text
-    assert "Open SecureNet" in mail["html"] and "full report is attached" in mail["html"]
+    assert "ABNORMAL NETWORK FOUND" in text                 # leads with the verdict, not one attack guess
+    assert "report is attached" in mail["html"]
     assert len(text.splitlines()) < 20                     # a summary, not a dump of 30 alerts
     assert "203.0.113.7:50000" not in text                  # per-alert details live in the report
     [report] = mail["attachments"]
     body = report.content.decode("utf-8")
-    assert "Abnormal traffic : 30 incident(s)" in body and body.count("Event ID") == 30
+    assert "Flagged flows    : 30" in body and body.count("Event ID") == 30
     assert "203.0.113.7:50000" in body
 
 

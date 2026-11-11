@@ -72,7 +72,8 @@ interface AuthContextValue extends State {
   signup: (request: SignupRequest) => Promise<MessageResponse>;
   /** Sign in with a user already authenticated elsewhere (e.g. OTP verification). */
   completeLogin: (user: User) => void;
-  logout: () => Promise<void>;
+  /** Logout: confirm with the password → signs out and turns detection/protection off. */
+  logout: (password: string) => Promise<void>;
   clearError: () => void;
   isAuthenticated: boolean;
   /** only the Admin may change IDS settings, the model and incidents */
@@ -131,12 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'AUTHENTICATED', user });
   }, []);
 
-  const logout = useCallback(async (): Promise<void> => {
-    try {
-      await authService.logout();
-    } finally {
-      dispatch({ type: 'UNAUTHENTICATED' });
-    }
+  const logout = useCallback(async (password: string): Promise<void> => {
+    // Only end the session if the password checks out; a bad attempt throws and
+    // keeps the user signed in (so an attacker can't sign out to stop monitoring).
+    await authService.logout(password);
+    dispatch({ type: 'UNAUTHENTICATED' });
   }, []);
 
   const clearError = useCallback((): void => {

@@ -91,7 +91,7 @@ async def test_server_shutdown_keeps_the_saved_choice(capture):
 
 
 async def test_resume_after_restart_turns_ids_on_with_one_notice(capture):
-    who = {"name": "Admin", "email": "admin@example.com", "phone": None, "role": "admin"}
+    who = {"name": "Admin", "email": "admin@example.com", "role": "admin"}
     autostart.save_state(True, who)
     assert await autostart.resume_after_restart() is True
     ids = get_ids_service()

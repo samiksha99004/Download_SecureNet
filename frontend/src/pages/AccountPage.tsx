@@ -2,7 +2,7 @@
  * SecureNet — Account Page
  *
  * Displays the authenticated user's profile and account metadata, lets them
- * edit their name / phone / email (each change confirmed by an emailed code)
+ * edit their name / email (each change confirmed by an emailed code)
  * and change their password.
  *
  * All data comes from AuthContext — no fabricated values.
@@ -54,7 +54,7 @@ export function AccountPage() {
 
         {/* Two-column grid on wide screens */}
         <div className={styles.grid}>
-          <EditProfileCard key={`${user.email}|${user.fullName}|${user.phoneNumber ?? ''}`} user={user} />
+          <EditProfileCard key={`${user.email}|${user.fullName}`} user={user} />
           <ChangePasswordCard user={user} />
           <AccountInfoCard user={user} />
         </div>

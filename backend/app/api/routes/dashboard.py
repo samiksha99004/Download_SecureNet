@@ -40,11 +40,13 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 _net_sample: dict = {"time": None, "bytes": None}
 
 
-async def _load_summary() -> DashboardSummary:
-    """Three queries (all counts in one); own session so it can also run in the background."""
+async def _load_summary(owner_id: str) -> DashboardSummary:
+    """Three queries (all counts in one); own session so it can also run in the background.
+    Scoped to `owner_id` so each account sees only its own events."""
     one_hour_ago = utcnow() - timedelta(hours=1)
     recent_hour = SecurityEvent.timestamp >= one_hour_ago
     active = SecurityEvent.state == EventState.ACTIVE
+    owned = SecurityEvent.owner_id == owner_id
     async with AsyncSessionLocal() as db:
         row = (await db.execute(
             select(
@@ -54,17 +56,17 @@ async def _load_summary() -> DashboardSummary:
                 func.avg(SecurityEvent.anomaly_score).filter(recent_hour),
                 func.count().filter(SecurityEvent.severity == SeverityLevel.LOW, active),
                 func.count().filter(SecurityEvent.severity == SeverityLevel.MEDIUM, active),
-            ).select_from(SecurityEvent)
+            ).select_from(SecurityEvent).where(owned)
         )).one()
         attack_rows = (await db.execute(
             select(SecurityEvent.attack_type, func.count())
-            .where(SecurityEvent.attack_type.isnot(None))
+            .where(SecurityEvent.attack_type.isnot(None), owned)
             .group_by(SecurityEvent.attack_type)
             .order_by(desc(func.count()))
             .limit(10)
         )).all()
         recent = (await db.execute(
-            select(SecurityEvent).order_by(desc(SecurityEvent.timestamp)).limit(10)
+            select(SecurityEvent).where(owned).order_by(desc(SecurityEvent.timestamp)).limit(10)
         )).scalars().all()
     return DashboardSummary(
         active_flows=0,
@@ -78,25 +80,27 @@ async def _load_summary() -> DashboardSummary:
     )
 
 
-async def cached_summary() -> DashboardSummary:
-    # "last hour" moves with the clock: refreshed in the background every 30 s
-    return await cached("events:dashboard-summary", _load_summary, ttl=30)
+async def cached_summary(owner_id: str) -> DashboardSummary:
+    # "last hour" moves with the clock: refreshed in the background every 30 s. Per-account key.
+    return await cached(f"events:dashboard-summary:{owner_id}", lambda: _load_summary(owner_id), ttl=30)
 
 
-async def _load_protocols() -> ProtocolDistribution:
+async def _load_protocols(owner_id: str) -> ProtocolDistribution:
     async with AsyncSessionLocal() as db:
-        rows = await db.execute(select(SecurityEvent.protocol, func.count()).group_by(SecurityEvent.protocol))
+        rows = await db.execute(select(SecurityEvent.protocol, func.count())
+                                .where(SecurityEvent.owner_id == owner_id)
+                                .group_by(SecurityEvent.protocol))
         counts = {row[0]: row[1] for row in rows}
     tcp, udp = counts.get(Protocol.TCP, 0), counts.get(Protocol.UDP, 0)
     icmp, other = counts.get(Protocol.ICMP, 0), counts.get(Protocol.OTHER, 0)
     return ProtocolDistribution(tcp=tcp, udp=udp, icmp=icmp, other=other, total_flows=tcp + udp + icmp + other)
 
 
-async def cached_protocols() -> ProtocolDistribution:
-    return await cached("events:protocols", _load_protocols, ttl=300)
+async def cached_protocols(owner_id: str) -> ProtocolDistribution:
+    return await cached(f"events:protocols:{owner_id}", lambda: _load_protocols(owner_id), ttl=300)
 
 
-async def _load_top_sources(limit: int) -> List[TopSource]:
+async def _load_top_sources(owner_id: str, limit: int) -> List[TopSource]:
     from sqlalchemy import case
 
     async with AsyncSessionLocal() as db:
@@ -108,6 +112,7 @@ async def _load_top_sources(limit: int) -> List[TopSource]:
                 func.sum(case((SecurityEvent.severity == SeverityLevel.HIGH, 1), else_=0)),
                 func.max(SecurityEvent.timestamp),
             )
+            .where(SecurityEvent.owner_id == owner_id)
             .group_by(SecurityEvent.source_ip)
             .order_by(desc("event_count"))
             .limit(limit)
@@ -124,8 +129,8 @@ async def _load_top_sources(limit: int) -> List[TopSource]:
     ]
 
 
-async def cached_top_sources(limit: int = 5) -> List[TopSource]:
-    return await cached(f"events:top-sources:{limit}", lambda: _load_top_sources(limit), ttl=300)
+async def cached_top_sources(owner_id: str, limit: int = 5) -> List[TopSource]:
+    return await cached(f"events:top-sources:{owner_id}:{limit}", lambda: _load_top_sources(owner_id, limit), ttl=300)
 
 
 @router.get("/summary", response_model=DashboardSummary)
@@ -140,7 +145,7 @@ async def get_dashboard_summary(current_user: User = Depends(get_current_user)):
 
     Served from memory; reloaded when events change (see services/cache.py).
     """
-    summary = await cached_summary()
+    summary = await cached_summary(current_user.id)
     return summary.model_copy(update={"active_flows": get_ids_service().get_status()["active_flows"]})
 
 
@@ -173,7 +178,7 @@ async def get_host_status(current_user: User = Depends(get_current_user)):
 @router.get("/protocol-distribution", response_model=ProtocolDistribution)
 async def get_protocol_distribution(current_user: User = Depends(get_current_user)):
     """Protocol distribution of stored security events (served from memory)."""
-    return await cached_protocols()
+    return await cached_protocols(current_user.id)
 
 
 @router.get("/top-sources", response_model=List[TopSource])
@@ -182,4 +187,4 @@ async def get_top_sources(
     current_user: User = Depends(get_current_user),
 ):
     """Source IPs with the most security events (served from memory)."""
-    return await cached_top_sources(limit)
+    return await cached_top_sources(current_user.id, limit)

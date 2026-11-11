@@ -59,7 +59,11 @@ class SecurityEvent(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     timestamp = Column(DateTime, nullable=False, default=utcnow, index=True)
-    
+    # The account that owns this event: whoever was logged in (running the IDS) when it was
+    # detected. Every dashboard / history / report / notification query is filtered by it, so
+    # each account sees only its own data. Nullable for events detected with nobody logged in.
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+
     # Network information
     source_ip = Column(String(45), nullable=False, index=True)  # IPv4/IPv6
     source_port = Column(Integer, nullable=False)

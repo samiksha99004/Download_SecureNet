@@ -30,7 +30,7 @@ const STEPS: { title: string; text: string }[] = [
   },
   {
     title: 'Make it yours',
-    text: 'In Settings choose the dark or peach theme and turn notifications or their sound on or off. On Account you can change your name, phone number, email or password (each confirmed with a code sent to your email).',
+    text: 'In Settings choose the dark or peach theme and turn notifications or their sound on or off. On Account you can change your name, email or password (each confirmed with a code sent to your email).',
   },
 ];
 

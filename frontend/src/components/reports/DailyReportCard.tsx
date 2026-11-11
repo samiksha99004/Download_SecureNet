@@ -1,19 +1,19 @@
 /**
- * SecureNet — DailyReportCard
+ * SecureNet — ReportWindowCard
  *
- * One box per day that had attacks: counts by severity, most common attack,
- * number of attacking sources, first/last detection time, and downloads of
- * that day's report (.txt, .pdf).
+ * One box per 6-hour window that had attacks: the date + time range, counts by
+ * severity, most common attack, number of attacking sources, first/last
+ * detection time, and downloads of that window's report (.txt, .pdf).
  */
 
 import { useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { useToast } from '../common/Toast';
-import { downloadDailyReport } from '../../services/reportsService';
-import type { DailyReport, DailyReportFormat } from '../../types/reports.types';
+import { downloadWindowReport } from '../../services/reportsService';
+import type { ReportWindow, ReportFormat } from '../../types/reports.types';
 import styles from './DailyReportCard.module.css';
 
-const FORMATS: { id: DailyReportFormat; label: string }[] = [
+const FORMATS: { id: ReportFormat; label: string }[] = [
   { id: 'txt', label: '.txt' },
   { id: 'pdf', label: '.pdf' },
 ];
@@ -29,14 +29,14 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-export function DailyReportCard({ report }: { report: DailyReport }) {
+export function DailyReportCard({ report }: { report: ReportWindow }) {
   const { showToast } = useToast();
-  const [busy, setBusy] = useState<DailyReportFormat | null>(null);
+  const [busy, setBusy] = useState<ReportFormat | null>(null);
 
-  async function download(format: DailyReportFormat) {
+  async function download(format: ReportFormat) {
     setBusy(format);
     try {
-      await downloadDailyReport(report.date, format);
+      await downloadWindowReport(report.key, format);
     } catch (err) {
       showToast({
         message: err instanceof Error && err.message ? err.message : 'Could not download the report.',
@@ -54,7 +54,7 @@ export function DailyReportCard({ report }: { report: DailyReport }) {
         <div>
           <h3 className={styles.day}>{formatDay(report.date)}</h3>
           <p className={styles.range}>
-            {report.total} abnormal traffic alert{report.total === 1 ? '' : 's'} · {formatTime(report.firstSeen)}
+            {report.rangeLabel} · {report.total} alert{report.total === 1 ? '' : 's'} · {formatTime(report.firstSeen)}
             {report.total > 1 && <> – {formatTime(report.lastSeen)}</>}
           </p>
         </div>
@@ -68,7 +68,7 @@ export function DailyReportCard({ report }: { report: DailyReport }) {
 
       <dl className={styles.facts}>
         <div>
-          <dt>Most likely attack (model’s guess)</dt>
+          <dt>Most common attack</dt>
           <dd>{report.topAttack ?? 'Unknown'}</dd>
         </div>
         <div>
@@ -89,7 +89,7 @@ export function DailyReportCard({ report }: { report: DailyReport }) {
               className={`${styles.button} ${id === 'txt' ? styles.primary : ''}`}
               onClick={() => void download(id)}
               disabled={busy !== null}
-              aria-label={`Download ${formatDay(report.date)} report as ${label}`}
+              aria-label={`Download ${formatDay(report.date)} ${report.rangeLabel} report as ${label}`}
             >
               {busy === id ? '…' : label}
             </button>

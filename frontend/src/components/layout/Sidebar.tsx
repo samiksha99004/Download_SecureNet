@@ -10,7 +10,7 @@
  *  - Logout button at bottom
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { LogoutDialog } from '../common/LogoutDialog';
 import { cn } from '../../utils/cn';
 import styles from './Sidebar.module.css';
 import { roleLabel } from '../../utils/roles';
@@ -58,13 +59,14 @@ export function Sidebar({
   mobileOpen,
   onCloseMobile,
 }: SidebarProps) {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [showLogout, setShowLogout] = useState(false);
 
-  const handleLogout = useCallback(async () => {
-    await logout();
+  const handleLoggedOut = useCallback(() => {
+    setShowLogout(false);
     navigate('/login', { replace: true });
-  }, [logout, navigate]);
+  }, [navigate]);
 
   const sidebarContent = (
     <div
@@ -143,7 +145,7 @@ export function Sidebar({
 
         <button
           className={styles.logoutButton}
-          onClick={handleLogout}
+          onClick={() => setShowLogout(true)}
           title={collapsed ? 'Sign out' : undefined}
           aria-label="Sign out"
         >
@@ -172,6 +174,12 @@ export function Sidebar({
           </aside>
         </>
       )}
+
+      <LogoutDialog
+        isOpen={showLogout}
+        onClose={() => setShowLogout(false)}
+        onLoggedOut={handleLoggedOut}
+      />
     </>
   );
 }

@@ -84,7 +84,6 @@ function normaliseUser(raw: Record<string, unknown>): User | null {
     createdAt: str('createdAt', 'created_at') ?? '',
     lastLoginAt: str('lastLoginAt', 'last_login_at'),
     avatarUrl: str('avatarUrl', 'avatar_url'),
-    phoneNumber: str('phoneNumber', 'phone_number'),
     emailAlerts: (raw.emailAlerts ?? raw.email_alerts) !== false,
   };
 }
@@ -167,15 +166,14 @@ export async function resetPassword(request: ResetPasswordRequest): Promise<Mess
   return apiClient.post<MessageResponse>('/auth/password/reset', request, { skipAuth: true });
 }
 
-/** POST /auth/logout — always clears local tokens. */
-export async function logout(): Promise<void> {
-  try {
-    await apiClient.post<MessageResponse>('/auth/logout', {});
-  } catch {
-    // Always clear local state even if the server call fails
-  } finally {
-    clearTokens();
-  }
+/**
+ * POST /auth/logout — confirm sign-out with the account password.
+ * On success the backend turns detection and protection OFF; local tokens are cleared.
+ * Throws if the password is wrong, so the session is NOT ended on a bad attempt.
+ */
+export async function logout(password: string): Promise<void> {
+  await apiClient.post<MessageResponse>('/auth/logout', { password });
+  clearTokens();
 }
 
 /** GET /auth/me */
@@ -197,7 +195,7 @@ export async function confirmProfileChange(changeToken: string, otp: string): Pr
   return user;
 }
 
-/** PUT /auth/profile — verify and update name / phone / email directly (no emailed code). */
+/** PUT /auth/profile — verify and update name / email directly (no emailed code). */
 export async function updateProfile(request: ProfileChangeRequest): Promise<User> {
   const user = await apiClient.put<User>('/auth/profile', request);
   storeUser(user);

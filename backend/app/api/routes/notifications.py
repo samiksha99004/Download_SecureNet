@@ -62,16 +62,17 @@ class NotificationStatus(CamelModel):
     last_error: Optional[str] = None
 
 
-async def _load_feed(limit: int) -> List[NotificationItem]:
+async def _load_feed(owner_id: str, limit: int) -> List[NotificationItem]:
     async with AsyncSessionLocal() as db:
         events = (await db.execute(
-            select(SecurityEvent).order_by(desc(SecurityEvent.timestamp)).limit(limit)
+            select(SecurityEvent).where(SecurityEvent.owner_id == owner_id)
+            .order_by(desc(SecurityEvent.timestamp)).limit(limit)
         )).scalars().all()
     return [NotificationItem.model_validate(alert_payload(e)) for e in events]
 
 
-async def cached_feed(limit: int = 30) -> List[NotificationItem]:
-    return await cached(f"events:feed:{limit}", lambda: _load_feed(limit), ttl=300)
+async def cached_feed(owner_id: str, limit: int = 30) -> List[NotificationItem]:
+    return await cached(f"events:feed:{owner_id}:{limit}", lambda: _load_feed(owner_id, limit), ttl=300)
 
 
 @router.get("", response_model=List[NotificationItem])
@@ -80,7 +81,7 @@ async def list_notifications(
     current_user: User = Depends(get_current_user),
 ):
     """Most recent security alerts (newest first; served from memory)."""
-    return await cached_feed(limit)
+    return await cached_feed(current_user.id, limit)
 
 
 async def _load_recipients() -> tuple[bool, List[str]]:

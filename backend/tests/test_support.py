@@ -53,7 +53,7 @@ async def test_send_us_a_message(client, admin, captured_otps, monkeypatch):
         sent.append({"to": list(recipients), "subject": subject, "text": text, "html": html, "reply_to": reply_to})
 
     monkeypatch.setattr(support, "send_email", fake_send)
-    user = await register(client, captured_otps, email="asha@example.com", name="Asha Rao", phone="+919876543210")
+    user = await register(client, captured_otps, email="asha@example.com", name="Asha Rao")
     headers = {"Authorization": f"Bearer {user['tokens']['accessToken']}"}
 
     # sign-in required, and the text is validated
@@ -69,7 +69,7 @@ async def test_send_us_a_message(client, admin, captured_otps, monkeypatch):
     to_admin, copy = sent
     assert to_admin["to"] == ["boss@example.com"] and to_admin["reply_to"] == "asha@example.com"
     assert to_admin["subject"] == "[SecureNet Support] Strange alert at night"
-    assert "Asha Rao <asha@example.com>" in to_admin["text"] and "+919876543210" in to_admin["text"]
+    assert "Asha Rao <asha@example.com>" in to_admin["text"]
     assert "<script>" not in to_admin["html"] and "&lt;script&gt;" in to_admin["html"]
     assert copy["to"] == ["asha@example.com"] and copy["reply_to"] == "boss@example.com"
 

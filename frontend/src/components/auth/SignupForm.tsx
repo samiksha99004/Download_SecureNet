@@ -1,18 +1,18 @@
 /**
  * SecureNet — SignupForm (registration step 1 of 3)
  *
- *  1. Full name, email, phone number → a verification code is emailed
+ *  1. Full name, email → a verification code is emailed
  *  2. OtpForm: enter the code
  *  3. CreatePasswordForm: choose the password → account created + signed in
  *
- * Full client-side validation (same phone rule as the backend), loading and
- * error states. On success it opens the code page for that email.
+ * Full client-side validation, loading and error states. On success it opens
+ * the code page for that email.
  */
 
 import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { isValidEmail, isValidPhone, isNonEmpty, minLength } from '../../utils/validation';
+import { isValidEmail, isNonEmpty, minLength } from '../../utils/validation';
 import { FormField } from './FormField';
 import { AuthButton } from './AuthButton';
 import styles from './SignupForm.module.css';
@@ -20,7 +20,6 @@ import styles from './SignupForm.module.css';
 interface FormErrors {
   fullName?: string;
   email?: string;
-  phoneNumber?: string;
 }
 
 export function SignupForm() {
@@ -29,7 +28,6 @@ export function SignupForm() {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -54,12 +52,6 @@ export function SignupForm() {
       next.email = 'Please enter a valid email address.';
     }
 
-    if (!isNonEmpty(phoneNumber)) {
-      next.phoneNumber = 'Phone number is required.';
-    } else if (!isValidPhone(phoneNumber)) {
-      next.phoneNumber = 'Enter a valid phone number (7–15 digits, e.g. +91 98765 43210).';
-    }
-
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -74,7 +66,6 @@ export function SignupForm() {
       await signup({
         fullName: fullName.trim(),
         email: email.trim(),
-        phoneNumber: phoneNumber.trim(),
       });
       navigate('/otp-verify', { state: { email: email.trim() } });
     } catch (err) {
@@ -123,19 +114,6 @@ export function SignupForm() {
           error={errors.email}
           disabled={isLoading}
           hint={!errors.email ? 'The verification code is sent here.' : undefined}
-        />
-
-        <FormField
-          id="signup-phone"
-          label="Phone number"
-          type="tel"
-          value={phoneNumber}
-          onChange={(e) => { setPhoneNumber(e.target.value); clearField('phoneNumber'); }}
-          autoComplete="tel"
-          inputMode="tel"
-          placeholder="+91 98765 43210"
-          error={errors.phoneNumber}
-          disabled={isLoading}
         />
 
         <AuthButton type="submit" isLoading={isLoading} disabled={isLoading}>

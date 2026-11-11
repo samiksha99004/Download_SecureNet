@@ -38,13 +38,13 @@ async def test_each_user_can_switch_alert_emails_off_and_on(client, captured_otp
     assert (await client.get("/api/auth/me", headers=h)).json()["emailAlerts"] is False   # not a stale cached copy
     async with AsyncSessionLocal() as db:
         everyone = await get_recipients(db, None)
-    assert everyone == []                                           # admin never gets attack emails
+    assert everyone == ["boss@example.com"]                         # the admin now receives alerts too
 
     r = await client.put("/api/auth/me/preferences", headers=h, json={"emailAlerts": True})
     assert r.json()["emailAlerts"] is True
     async with AsyncSessionLocal() as db:
         users = await get_recipients(db, None)
-    assert users == ["worker@example.com"]
+    assert users == ["boss@example.com", "worker@example.com"]
 
     assert (await client.put("/api/auth/me/preferences", json={"emailAlerts": False})).status_code == 401
     assert admin["user"]["role"] == "admin"
@@ -69,6 +69,8 @@ async def test_dashboard_summary_needs_three_queries_and_updates_on_new_events(c
 
     ids = IDSService()
     ids.detector = FakeDetector(Detection(0.95, True, "DDoS", 0.99))
+    ids._abnormal_now = True                                         # abnormal window with DDoS majority
+    ids._majority_attack = "DDoS"
     stored = await ids.process_flow(make_flow())                    # a new attack is stored
     after = (await client.get("/api/dashboard/summary", headers=headers)).json()
     assert after["anomaliesLastHour"] == 1 and after["highSeverityCount"] == 1
@@ -117,7 +119,7 @@ async def test_history_and_recipients_are_never_stale(client, captured_otps):
     ha = {"Authorization": f"Bearer {admin['tokens']['accessToken']}"}
     hu = {"Authorization": f"Bearer {user['tokens']['accessToken']}"}
     assert (await client.get("/api/events", headers=ha)).json()["total"] == 0
-    assert (await client.get("/api/notifications/status", headers=ha)).json()["recipientCount"] == 1   # the user, not the admin
+    assert (await client.get("/api/notifications/status", headers=ha)).json()["recipientCount"] == 2   # the user AND the admin
     await client.get("/api/settings", headers=ha)      # first load (creates the settings rows here)
     with count_queries() as q:
         await client.get("/api/events", headers=ha)
@@ -129,8 +131,11 @@ async def test_history_and_recipients_are_never_stale(client, captured_otps):
 
     ids = IDSService()
     ids.detector = FakeDetector(Detection(0.95, True, "DDoS", 0.99))
+    ids.active_owner_id = admin["user"]["id"]                        # the event belongs to boss2
+    ids._abnormal_now = True                                         # abnormal window with DDoS majority
+    ids._majority_attack = "DDoS"
     await ids.process_flow(make_flow())
     assert (await client.get("/api/events", headers=ha)).json()["total"] == 1      # new event shows at once
 
     await client.put("/api/auth/me/preferences", headers=hu, json={"emailAlerts": False})
-    assert (await client.get("/api/notifications/status", headers=ha)).json()["recipientCount"] == 0
+    assert (await client.get("/api/notifications/status", headers=ha)).json()["recipientCount"] == 1   # the admin remains

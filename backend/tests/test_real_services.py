@@ -55,7 +55,7 @@ async def test_disabled_email_raises_instead_of_pretending(monkeypatch):
 
 async def test_signup_without_email_setup_is_refused(client):
     r = await client.post("/api/auth/signup", json={
-        "fullName": "Real Person", "email": "real.person@gmail.com", "phoneNumber": "+919876543210",
+        "fullName": "Real Person", "email": "real.person@gmail.com",
     })
     assert r.status_code == 503
     assert "can't send emails yet" in r.json()["message"] and ".env" not in r.json()["message"]
@@ -65,7 +65,7 @@ async def test_signup_without_email_setup_is_refused(client):
 
 
 async def test_code_email_design_and_subjects(monkeypatch):
-    """Code emails: "[SecureNet] <purpose> verification code", one box per digit, selectable code, 5 minutes."""
+    """Code emails: "[SecureNet] <purpose> verification code", one contiguous selectable code, 5 minutes."""
     sent = []
 
     async def fake_send(recipients, subject, text, html, attachments=None, reply_to=None):
@@ -85,9 +85,7 @@ async def test_code_email_design_and_subjects(monkeypatch):
     ]
     _, _, text, html = sent[0]
     assert "verification code is: 137296" in text and "5 minutes" in text
-    assert "Code requested" in html and "5 minutes" in html
+    assert "Your code" in html and "5 minutes" in html         # the code panel
     assert "<a " not in html and "/code#" not in text          # no links: nothing to open, just the code
-    assert "Your code" not in html and "Double-click" not in html   # only the digit boxes
-    for digit in "137296":
-        assert f'color:#1f2328">{digit}</div>' in html          # one box per digit
-    assert html.count("137296") == 1                           # only in the hidden inbox preview line
+    assert "Double-click" not in html                          # no custom copy button (email has no JS)
+    assert ">137296</div>" in html                             # one contiguous, selectable code string

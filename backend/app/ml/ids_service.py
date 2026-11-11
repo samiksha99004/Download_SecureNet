@@ -48,7 +48,7 @@ from app.services.cache import events_changed
 from app.services.notifier import get_notifier, get_recipients
 from app.utils.email import send_email
 from app.utils.desktop import notify_desktop   # backend-native Windows toast (works with the app closed)
-from app.services.verdict import ABNORMAL, BENIGN_NAMES, possible_attack
+from app.services.verdict import ABNORMAL, BENIGN_NAMES, possible_attack, pretty_label
 from app.websocket.manager import manager
 
 QUEUE_SIZE = 10_000
@@ -58,6 +58,8 @@ ABNORMAL_PCT_THRESHOLD = 30  # attacks must exceed this % of recent flows to cou
 DESKTOP_ALERT_INTERVAL = 180 # desktop pop: first immediately, then every 3 min while abnormal
 TREND_POINTS = 72            # attack-% history for the dashboard trend chart (72 x 5s = last 6 min)
 STORE_THROTTLE_SECONDS = 300 # store/alert at most ONE event per attack type per 5 min (not per flow)
+INCIDENT_STORE_DELAY_SECONDS = 60  # wait this long into an abnormal episode before writing its ONE
+                                   # History entry, so the breakdown has settled on the real attack
 PROTECTION_VERDICT_DELAY = 15    # wait this long (s) after a block before judging success/failure
 SUCCESS_CHECK_WINDOW = 12        # attacks in the last N s decide it: ~none => network benign again
 PROTECTION_NOTIFY_COOLDOWN = 300 # at most one "protection successful/failed" notice per 5 min
@@ -71,6 +73,31 @@ PRESET_OFFSETS = {
     DetectionSensitivity.MEDIUM: 0.0,    # the tested threshold
     DetectionSensitivity.HIGH: -0.03,    # catch more, more false alarms
 }
+
+
+# ── active owner (the logged-in account that owns new detections) ──────────────
+# Persisted next to the IDS on/off state so it survives a backend restart: the IDS stamps every
+# stored event with it, and each account's dashboard/alerts are filtered to its own events.
+
+def _active_owner_file():
+    return settings.ids_state_file.with_name("active-owner.txt")
+
+
+def _load_active_owner() -> Optional[str]:
+    try:
+        value = _active_owner_file().read_text(encoding="utf-8").strip()
+        return value or None
+    except OSError:
+        return None
+
+
+def _save_active_owner(owner_id: Optional[str]) -> None:
+    try:
+        path = _active_owner_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(owner_id or "", encoding="utf-8")
+    except OSError as exc:
+        logger.warning(f"Could not persist active owner: {exc}")
 
 
 BENIGN_GUESS = "Benign"            # Table 2 row: stage 2 cancelled the alarm
@@ -138,6 +165,15 @@ class IDSService:
         self.started_at: Optional[float] = None
         # Who turned the IDS on (shown in the admin's alert email)
         self.started_by: Optional[dict] = None
+        # The account that currently owns detections: whoever is logged in (set on login / when the
+        # IDS is turned on). Every stored event is stamped with it, so each account sees only its own
+        # data and its alerts go only to that user. Persisted so it survives a backend restart.
+        self.active_owner_id: Optional[str] = _load_active_owner()
+        # "Today's abnormal count": number of distinct abnormal episodes detected today. Incremented
+        # once each time the network goes normal -> abnormal (not while it stays abnormal); resets at
+        # midnight (local). Kept across IDS ON/OFF within the day (not reset by reset_verdicts).
+        self._abnormal_count = 0
+        self._abnormal_count_date: Optional[str] = None
 
         self._queue: Optional[asyncio.Queue] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -175,8 +211,11 @@ class IDSService:
         self._abnormal_now = False        # gates the alert email (only while abnormal)
         self._abn_episode = False         # currently inside an abnormal episode
         self._abn_last_desktop = 0.0      # last desktop pop (epoch)
+        self._abn_episode_started_at = 0.0    # epoch the current abnormal episode began
+        self._abn_stored_this_episode = False # the one History entry for this episode is written
         self.trend: deque = deque(maxlen=TREND_POINTS)   # (epoch, attack%) for the dashboard trend chart
-        self._last_store: dict = {}       # attack_type -> last epoch an event was stored (5-min throttle)
+        self._last_store_time = 0.0       # last epoch a (majority) event was stored (global 5-min throttle)
+        self._majority_attack: Optional[str] = None   # dominant attack in the recent window (only one stored to History)
         # Protection outcome tracking: after a block we wait, then tell the user whether the
         # network went benign again (success) or the attack is still active (failed).
         self._protection_pending: Optional[dict] = None   # {"ips": set, "verdict_at": epoch}
@@ -288,6 +327,23 @@ class IDSService:
         if self.mode != DetectionMode.PROTECT:
             await self.blocker.unblock_all()
 
+    def set_active_owner(self, owner_id: Optional[str]) -> None:
+        """Remember which logged-in account owns new detections (and gets the alerts). Set on
+        sign-in and when the IDS is turned on; persisted so a backend restart keeps the owner."""
+        owner_id = str(owner_id) if owner_id else None
+        if owner_id != self.active_owner_id:
+            self.active_owner_id = owner_id
+            _save_active_owner(owner_id)
+            logger.info(f"IDS active owner set to {owner_id}")
+
+    def _owner_uuid(self):
+        """active_owner_id as a UUID for the SecurityEvent FK (None if unset/invalid)."""
+        try:
+            import uuid as _uuid
+            return _uuid.UUID(self.active_owner_id) if self.active_owner_id else None
+        except (TypeError, ValueError):
+            return None
+
     # ── configuration ────────────────────────────────────────────────────────
 
     async def reload_config(self) -> None:
@@ -365,6 +421,9 @@ class IDSService:
             "packets_processed": monitor.packet_count if monitor else 0,
             "flows_analyzed": self.flows_analyzed,
             "active_flows": monitor.active_flow_count if monitor else 0,
+            "abnormal_events_today": (self._abnormal_count
+                                      if self._abnormal_count_date == time.strftime("%Y-%m-%d", time.localtime())
+                                      else 0),
             "anomalies_detected": self.anomalies_detected,
             "attacks_detected": self.attacks_detected,
             "blocked_ips": len(self.blocker.blocked),
@@ -528,7 +587,7 @@ class IDSService:
             "message": f"{title}. {action}",
             "desktopPop": True,          # in-app popup + sound when the app is open
         }
-        await manager.send_alert(payload)
+        await manager.send_alert(payload, self.active_owner_id)   # only the logged-in account
         await notify_desktop(title, f"{body} {action}")   # OS toast — shows even with the app closed
         await self._email_protection_verdict(title, body, action, ips)
 
@@ -568,6 +627,10 @@ class IDSService:
         summary = self.verdict_summary()
         abnormal = summary["recent_total"] > 0 and summary["recent_abnormal_pct"] > ABNORMAL_PCT_THRESHOLD
         self._abnormal_now = abnormal
+        # Dominant (majority) attack in the recent window — the ONLY attack written to History and
+        # shown as the "Latest Unresolved Incident". Recomputed every maintenance tick (~5s).
+        _recent_attacks = [r for r in summary["recent"] if r["label"].lower() not in BENIGN_NAMES]
+        self._majority_attack = _recent_attacks[0]["label"] if _recent_attacks else None
         self.trend.append((time.time(), summary["recent_abnormal_pct"]))   # 5s-spaced attack-% history
         if not abnormal:
             self._abn_episode = False      # back to normal -> next abnormal starts a fresh episode
@@ -577,6 +640,16 @@ class IDSService:
         if first:
             self._abn_episode = True
             self._abn_last_desktop = 0.0   # force an immediate desktop pop on episode start
+            # History gets ONE entry per incident, written 1 min in once the breakdown has settled on
+            # the real (majority) attack — not a new random row every few minutes.
+            self._abn_episode_started_at = now
+            self._abn_stored_this_episode = False
+            # count this new abnormal episode towards today's total (slope went up again)
+            today = time.strftime("%Y-%m-%d", time.localtime())
+            if self._abnormal_count_date != today:
+                self._abnormal_count_date = today
+                self._abnormal_count = 0
+            self._abnormal_count += 1
         if first or (now - self._abn_last_desktop) >= DESKTOP_ALERT_INTERVAL:
             self._abn_last_desktop = now
             try:
@@ -587,9 +660,9 @@ class IDSService:
     async def _send_desktop_abnormal(self, summary: dict) -> None:
         """Pop one desktop notification summarising the current abnormal traffic (every 3 min)."""
         attacks = [r for r in summary["recent"] if r["label"].lower() not in ("benign", "normal")]
-        top = attacks[0]["label"] if attacks else "Unknown"
+        top = pretty_label(attacks[0]["label"]) if attacks else "Unknown"   # display name only
         pct = summary["recent_abnormal_pct"]
-        breakdown = ", ".join(f"{r['label']} {r['pct']:.0f}%" for r in attacks[:3])
+        breakdown = ", ".join(f"{pretty_label(r['label'])} {r['pct']:.0f}%" for r in attacks[:3])
         payload = {
             "eventId": f"network-{int(time.time())}",
             "timestamp": to_iso_z(utcnow()),
@@ -608,7 +681,7 @@ class IDSService:
             "message": f"Abnormal network traffic — attacks are {pct:.0f}% of recent flows ({breakdown}).",
             "desktopPop": True,          # in-app popup when the app is open
         }
-        await manager.send_alert(payload)
+        await manager.send_alert(payload, self.active_owner_id)   # only the logged-in account
         # OS desktop toast straight from the backend → shows even when SecureNet is NOT open
         await notify_desktop("Abnormal network traffic detected",
                              f"Attacks are {pct:.0f}% of recent flows ({breakdown}). Open SecureNet to see why.")
@@ -736,6 +809,28 @@ class IDSService:
             else:
                 logger.warning(f"Advanced Protection could not block {flow.src_ip}: {note}")
 
+        # History timing while abnormal: write the FIRST row ~1 min into the incident (once the live
+        # breakdown has settled on the real dominant attack), then a NEW row every STORE_THROTTLE_SECONDS
+        # (5 min) for as long as it stays abnormal. Each row is the current majority (highest-%) attack;
+        # the email is queued at the same time (below, gated on self._abnormal_now). A fresh episode
+        # (network went normal then abnormal again) starts over at the 1-min mark. Scoring, the live
+        # breakdown and the trend still count every flow elsewhere and are unaffected.
+        now = time.time()
+        episode_age = now - getattr(self, "_abn_episode_started_at", 0.0)
+        is_majority = (self._abnormal_now and self._majority_attack is not None
+                       and detection.attack_type == self._majority_attack)
+        first = not getattr(self, "_abn_stored_this_episode", False)
+        ready = is_majority and (
+            (first and episode_age >= INCIDENT_STORE_DELAY_SECONDS)          # first row: 1 min in
+            or (not first and (now - self._last_store_time) >= STORE_THROTTLE_SECONDS))  # then every 5 min
+        if not ready:
+            await self._broadcast_score(flow, detection, severity, throttle=True)
+            return None
+
+        # Anti-flood cap — checked ONLY here, AFTER the majority/timing gate, so a heavy attack's
+        # thousands of flagged flows (which won't be stored anyway during the 1-min wait) can't burn
+        # the storm budget and block the one row we DO want. We store ~1 row per 1–5 min, so this
+        # effectively never trips now; it stays as a last-resort guard.
         if not self._storm_allows(flow.src_ip):
             self.alerts_not_stored += 1
             if self.alerts_not_stored % 100 == 1:
@@ -743,15 +838,8 @@ class IDSService:
                                f"(limit {settings.ALERT_STORE_MAX_PER_MINUTE}/min)")
             await self._broadcast_score(flow, detection, severity, throttle=True)
             return None
-
-        # Store/alert at most ONE event per attack type per 5 min (history gets a row every ~5 min,
-        # not every second). Scoring/trend/breakdown are unaffected — they count every flow elsewhere.
-        store_key = detection.attack_type or "unclassified"
-        now = time.time()
-        if now - self._last_store.get(store_key, 0) < STORE_THROTTLE_SECONDS:
-            await self._broadcast_score(flow, detection, severity, throttle=True)
-            return None
-        self._last_store[store_key] = now
+        self._abn_stored_this_episode = True
+        self._last_store_time = now
 
         # Record in the report whether Advanced Protection has blocked this attacker's IP.
         if flow.src_ip in self.blocker.blocked:
@@ -761,8 +849,18 @@ class IDSService:
             action = ActionTaken.ALERTED
             reason = detection.reason
 
+        # Store the REAL live breakdown (every attack class and its exact % of the recent window) with
+        # this incident, and set the confidence to the majority attack's actual share — so the report /
+        # PDF show the exact mix (e.g. "FTP 51%, XSS 48%, Bot 1%"), not a single per-flow guess.
+        _recent = self.verdict_summary().get("recent", [])
+        breakdown_guesses = [{"label": r["label"], "probability": round(float(r["pct"]) / 100.0, 4)}
+                             for r in _recent if str(r["label"]).lower() not in BENIGN_NAMES]
+        majority_share = next((round(float(r["pct"]) / 100.0, 4) for r in _recent
+                               if r["label"] == self._majority_attack), None)
+
         event = SecurityEvent(
             timestamp=utcnow(),
+            owner_id=self._owner_uuid(),     # the logged-in account this detection belongs to
             source_ip=flow.src_ip,
             source_port=flow.src_port,
             destination_ip=flow.dst_ip,
@@ -771,13 +869,13 @@ class IDSService:
             anomaly_score=round(detection.anomaly_score, 6),
             severity=severity,
             attack_type=detection.attack_type,
-            confidence=detection.confidence,
+            confidence=majority_share if majority_share is not None else detection.confidence,
             mode=self.mode,
             state=EventState.ACTIVE,
             action_taken=action,
             detection_reason=reason,
             contributing_features=detection.top_features or None,
-            attack_guesses=detection.guesses or None,
+            attack_guesses=breakdown_guesses or detection.guesses or None,
             flow_duration_ms=flow.duration_ms,
             bytes_sent=flow.fwd_bytes,
             bytes_received=flow.bwd_bytes,
@@ -793,7 +891,7 @@ class IDSService:
             self._last_blocked_event_id = str(event.id)   # so "click to view" opens the block
 
         await self._broadcast_score(flow, detection, severity, throttle=False)
-        await manager.send_alert(alert_payload(event))
+        await manager.send_alert(alert_payload(event), str(event.owner_id) if event.owner_id else None)
         # email only while the network is ABNORMAL (attacks > 40% of recent flows); the notifier
         # then sends at episode start + every ALERT_EMAIL_INTERVAL_SECONDS (10 min) while it lasts.
         if self._abnormal_now:

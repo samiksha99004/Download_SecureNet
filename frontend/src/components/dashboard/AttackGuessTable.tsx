@@ -7,6 +7,7 @@
  */
 
 import type { AttackChance } from '../../utils/verdict';
+import { prettyLabel } from '../../utils/verdict';
 import styles from './AttackGuessTable.module.css';
 
 interface AttackGuessTableProps {
@@ -30,7 +31,7 @@ export function AttackGuessTable({ rows, basis, total }: AttackGuessTableProps) 
         <tbody>
           {rows.map((row, i) => (
             <tr key={row.label} className={i === 0 ? styles.top : undefined}>
-              <td className={styles.name}>{row.label}</td>
+              <td className={styles.name}>{prettyLabel(row.label)}</td>
               <td className={styles.chance}>
                 <span className={styles.bar} aria-hidden="true">
                   <span className={styles.fill} style={{ width: `${Math.max(3, Math.round(row.chance * 100))}%` }} />

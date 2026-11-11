@@ -12,6 +12,20 @@ export const NORMAL_TRAFFIC = 'Normal traffic';
 
 const BENIGN = new Set(['benign', 'normal']);
 
+// DISPLAY-ONLY renaming: the model class stays "Brute Force -XSS" internally (detection, counting
+// and logic are unchanged); it is only SHOWN to the user as "Cross Site Scripting". Add more
+// { internal label (lowercased): shown name } pairs here if other labels need friendly names.
+const DISPLAY_NAMES: Record<string, string> = {
+  'brute force -xss': 'Cross Site Scripting',
+  'brute force-xss': 'Cross Site Scripting',
+};
+
+/** Map an internal model class name to the name shown to the user (display only). */
+export function prettyLabel(label: string | null | undefined): string {
+  if (!label) return label ?? '';
+  return DISPLAY_NAMES[label.trim().toLowerCase()] ?? label;
+}
+
 export function percent(p: number, digits = 0): string {
   return `${(p * 100).toFixed(digits)}%`;
 }
@@ -28,15 +42,16 @@ export function possibleAttack(
   event: Pick<SecurityEvent, 'attackType' | 'confidence' | 'attackGuesses'>,
 ): string {
   if (event.attackType) {
-    return event.confidence != null ? `${event.attackType} (${percent(event.confidence)})` : event.attackType;
+    const name = prettyLabel(event.attackType);
+    return event.confidence != null ? `${name} (${percent(event.confidence)})` : name;
   }
   const guess = guessesOf(event).find((g) => !BENIGN.has(g.label.toLowerCase()));
-  return guess ? `${guess.label} (${percent(guess.probability)}, unsure)` : 'Unknown';
+  return guess ? `${prettyLabel(guess.label)} (${percent(guess.probability)}, unsure)` : 'Unknown';
 }
 
 /** Name shown for a stage-2 class in the guess table. */
 export function guessLabel(label: string): string {
-  return BENIGN.has(label.toLowerCase()) ? 'Benign — not an attack' : label;
+  return BENIGN.has(label.toLowerCase()) ? 'Benign — not an attack' : prettyLabel(label);
 }
 
 /** Attacks below this chance are not shown (no tiny rows like "SQL Injection 0.3%"). */
@@ -59,7 +74,7 @@ export function attackChances(
   const total = attacks.reduce((sum, g) => sum + g.flows, 0);
   if (total > 0) {
     const rows = attacks
-      .map((g) => ({ label: g.label === 'Unclassified' ? 'Unknown type' : g.label, chance: g.flows / total }))
+      .map((g) => ({ label: g.label === 'Unclassified' ? 'Unknown type' : prettyLabel(g.label), chance: g.flows / total }))
       .filter((r) => r.chance >= MIN_SHOWN_CHANCE)
       .sort((a, b) => b.chance - a.chance);
     return { rows, basis: 'traffic', total };
@@ -67,7 +82,7 @@ export function attackChances(
   if (latest) {
     const rows = guessesOf(latest)
       .filter((g) => !BENIGN.has(g.label.toLowerCase()) && g.probability >= MIN_SHOWN_CHANCE)
-      .map((g) => ({ label: g.label, chance: g.probability }));
+      .map((g) => ({ label: prettyLabel(g.label), chance: g.probability }));
     if (rows.length) return { rows, basis: 'latest', total: 1 };
   }
   return { rows: [], basis: null, total: 0 };

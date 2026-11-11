@@ -23,7 +23,7 @@ import {
 import { requestDesktopNotifications } from '../../utils/alertChannels';
 import { formatTimestamp, formatDuration } from '../../utils/format';
 import type { SecurityEvent } from '../../types/security.types';
-import { plainReason, possibleAttack } from '../../utils/verdict';
+import { plainReason, possibleAttack, prettyLabel } from '../../utils/verdict';
 import styles from './IDSControlWidget.module.css';
 
 interface IDSControlWidgetProps {
@@ -85,6 +85,12 @@ export function IDSControlWidget({
   const ABNORMAL_THRESHOLD = 30;
   const liveAbnormal = isEnabled && recentTotal > 0 && recentAbnormalPct > ABNORMAL_THRESHOLD;
   const attackRows = recentRows.filter((r) => !isBenignLabel(r.label));
+  // The "Latest Unresolved Incident" analysis always names the MAJORITY attack of the live
+  // window — `recent` is sorted by share, so attackRows[0] is the dominant class — shown with
+  // its breakdown %. This keeps the Possible Attack consistent with the LIVE TRAFFIC BREAKDOWN
+  // and never surfaces a stale or secondary class (e.g. a one-off Bot flow) while FTP is the
+  // real majority. Falls back to the stored event's own guess only if the window has no attack.
+  const topAttack = attackRows[0] ?? null;
   // Has ANY flow been scored since the IDS was turned on? `scored` only grows during a session
   // (reset to 0 on each ON). We show "WAITING FOR TRAFFIC" ONLY before that first flow — once the
   // IDS has seen any traffic, a momentary lull (empty 90s window) is just quiet NORMAL, never a
@@ -104,6 +110,73 @@ export function IDSControlWidget({
   function isBenignLabel(l: string) {
     return ['benign', 'normal'].includes(l.toLowerCase());
   }
+
+  // ── Recommended actions ──────────────────────────────────────────────────
+  // When the network is abnormal, show the SAFETY STEPS for the detected attack(s).
+  // For a combination (e.g. DoS + SQL Injection) the steps are the UNION of both,
+  // de-duplicated into one bullet list, so the IDS tells the user what to actually do.
+  function attackCategory(label: string): string {
+    const l = label.toLowerCase();
+    if (l.includes('dos') || l.includes('ddos') || l.includes('hulk') || l.includes('goldeneye')
+      || l.includes('slowloris') || l.includes('slowhttp') || l.includes('loic') || l.includes('hoic')) return 'dos';
+    if (l.includes('sql')) return 'sqli';
+    if (l.includes('xss')) return 'xss';
+    if (l.includes('ftp') || l.includes('ssh') || (l.includes('brute') && l.includes('web')) || l.includes('bruteforce')) return 'brute';
+    if (l.includes('bot')) return 'bot';
+    if (l.includes('infilt') || l.includes('recon') || l.includes('scan')) return 'recon';
+    return 'generic';
+  }
+  const CATEGORY_STEPS: Record<string, string[]> = {
+    dos: [
+      'Block the attacking source IP at the firewall.',
+      'Rate-limit connections and requests per IP on the server.',
+      'Enable connection timeouts and SYN/flood protection.',
+      'Place the service behind a reverse proxy or WAF to absorb the flood.',
+      'For a heavy volumetric flood, contact your ISP or hosting provider.',
+    ],
+    brute: [
+      'Block the attacking source IP at the firewall.',
+      'Lock accounts after repeated failed logins and enforce strong passwords.',
+      'Enable multi-factor authentication (MFA) on exposed services.',
+      'Rate-limit login attempts (e.g. a fail2ban-style tool).',
+      'Restrict remote access (SSH/FTP) to trusted IP addresses only.',
+    ],
+    sqli: [
+      'Use parameterized queries / prepared statements in the application.',
+      'Validate and sanitize all user input.',
+      'Run the database with a least-privilege account.',
+      'Deploy a Web Application Firewall (WAF) to filter malicious queries.',
+      'Patch and update the vulnerable web application.',
+    ],
+    xss: [
+      'Escape and encode all user input shown on web pages (output encoding).',
+      'Set a strict Content-Security-Policy (CSP) header.',
+      'Validate and sanitize input on the server side.',
+      'Deploy a Web Application Firewall (WAF).',
+    ],
+    bot: [
+      'Isolate the affected host from the network.',
+      'Identify and block the beacon / command-and-control destination.',
+      'Run a full antivirus / EDR scan on the host.',
+      'Change any credentials that may have been exposed.',
+    ],
+    recon: [
+      'Block the scanning source IP at the firewall.',
+      'Close or firewall unused ports and services.',
+      'Watch closely for follow-up exploitation attempts.',
+    ],
+    generic: [
+      'Block the attacking source IP at the firewall.',
+      'Isolate the affected host and review the logs in History.',
+    ],
+  };
+  // attacks currently visible in the breakdown (any share shown, even 0.1%), named for the user
+  const activeAttacks = recentRows.filter((r) => !isBenignLabel(r.label) && r.pct >= 0.1);
+  const activeCats = Array.from(new Set(activeAttacks.map((r) => attackCategory(r.label))));
+  const actionSteps: string[] = [];
+  activeCats.forEach((c) => (CATEGORY_STEPS[c] ?? CATEGORY_STEPS.generic).forEach((s) => {
+    if (!actionSteps.includes(s)) actionSteps.push(s);
+  }));
 
   return (
     <div className={styles.widget}>
@@ -188,7 +261,7 @@ export function IDSControlWidget({
               return (
                 <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '5px 0' }}>
                   <span style={{ flex: '0 0 44%', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {r.label}
+                    {prettyLabel(r.label)}
                   </span>
                   <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(148,163,184,0.18)', overflow: 'hidden' }}>
                     <div style={{ width: `${r.pct}%`, height: '100%', background: color, borderRadius: 4 }} />
@@ -208,7 +281,10 @@ export function IDSControlWidget({
             <h3 className={styles.incidentTitle}>Latest Unresolved Incident</h3>
             <div className={styles.incidentGrid}>
               <DetailRow label="Verdict" value="Abnormal traffic" highlight />
-              <DetailRow label="Possible attack" value={possibleAttack(latestEvent)} />
+              <DetailRow
+                label="Possible attack"
+                value={topAttack ? `${prettyLabel(topAttack.label)} (${topAttack.pct.toFixed(1)}%)` : possibleAttack(latestEvent)}
+              />
               <DetailRow label="Severity" value={latestEvent.severity.toUpperCase()} />
               <DetailRow label="Source" value={`${latestEvent.sourceIp}:${latestEvent.sourcePort}`} />
               <DetailRow label="Destination" value={`${latestEvent.destinationIp}:${latestEvent.destinationPort}`} />
@@ -220,12 +296,44 @@ export function IDSControlWidget({
                 highlight={latestEvent.actionTaken === 'blocked'}
               />
             </div>
-            {latestEvent.detectionReason && (
+            {(topAttack || latestEvent.detectionReason) && (
               <div className={styles.reasonBox}>
                 <span className={styles.reasonLabel}>Detection Reason</span>
-                <p className={styles.reasonText}>{plainReason(latestEvent.detectionReason)}</p>
+                {/* Reason follows the LIVE majority too, so it never names a stale/secondary
+                    class (e.g. "Bot") while the real dominant attack is something else. */}
+                <p className={styles.reasonText}>
+                  {topAttack
+                    ? `Matches the pattern of ${prettyLabel(topAttack.label)} — ${topAttack.pct.toFixed(1)}% of recent traffic.`
+                    : plainReason(latestEvent.detectionReason)}
+                </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Recommended safety steps for the detected attack(s) — shown whenever an attack
+            appears in the breakdown (not only above the 30% abnormal headline). Union for a combination. */}
+        {!isOff && activeAttacks.length > 0 && actionSteps.length > 0 && (
+          <div style={{
+            marginTop: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)',
+            borderRadius: 12, padding: '14px 18px',
+          }}>
+            <div style={{
+              fontSize: 12, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase',
+              letterSpacing: '0.05em', marginBottom: 4,
+            }}>
+              Recommended Actions
+            </div>
+            <div style={{ fontSize: 13, color: '#cbd5e1', marginBottom: 10 }}>
+              Detected {activeAttacks.length > 1 ? 'attacks' : 'attack'}:{' '}
+              <b style={{ color: '#f87171' }}>{activeAttacks.map((a) => prettyLabel(a.label)).join(', ')}</b>
+              {activeAttacks.length > 1 && ' — steps for all are combined below.'}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {actionSteps.map((s, i) => (
+                <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: '#e2e8f0' }}>{s}</li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
@@ -235,9 +343,9 @@ export function IDSControlWidget({
         <div className={styles.statsRow}>
           <Stat label="Packets" value={idsStatus.packetsProcessed} />
           <Stat label="Flows Analyzed" value={idsStatus.flowsAnalyzed} />
-          <Stat label="Active Flows" value={idsStatus.activeFlows} />
           <Stat label="Normal Traffic" value={idsStatus.verdicts?.finalNormal ?? 0} />
           <Stat label="Abnormal Traffic" value={idsStatus.verdicts?.finalAbnormal ?? idsStatus.anomaliesDetected} />
+          <Stat label="Incidents Today" value={idsStatus.abnormalEventsToday ?? 0} />
         </div>
       )}
     </div>

@@ -61,7 +61,6 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=True)  # NULL until set after OTP verification
-    phone_number = Column(String(20), nullable=True)    # E.164-style digits, optional "+"
     role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.VIEWER)
     account_status = Column(SQLEnum(AccountStatus), nullable=False, default=AccountStatus.PENDING_VERIFICATION)
     auth_provider = Column(SQLEnum(AuthProvider), nullable=False, default=AuthProvider.LOCAL)

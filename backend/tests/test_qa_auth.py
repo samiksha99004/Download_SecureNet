@@ -13,11 +13,9 @@ from app.models.user import User
 from app.utils.timeutil import utcnow
 from tests.conftest import register
 
-PHONE = "9876543210"
-
 
 async def start_signup(client, email, name="Qa User"):
-    r = await client.post("/api/auth/signup", json={"fullName": name, "email": email, "phoneNumber": PHONE})
+    r = await client.post("/api/auth/signup", json={"fullName": name, "email": email})
     assert r.status_code == 200, r.text
 
 

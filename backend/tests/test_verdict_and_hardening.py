@@ -49,6 +49,10 @@ async def test_verdict_tables_count_stage1_and_stage2(client, admin):
 
     ids = IDSService()
     ids.detector = SequenceDetector([normal(), normal(), cancelled(), ddos()])
+    # Incidents are stored only for the abnormal window's majority attack; set that state
+    # (normally computed by the maintenance loop) so the one confirmed DDoS flow is stored.
+    ids._abnormal_now = True
+    ids._majority_attack = "DDoS"
     await ids.process_flows([make_flow() for _ in range(4)])
 
     summary = ids.verdict_summary()
@@ -70,16 +74,17 @@ async def test_verdict_tables_count_stage1_and_stage2(client, admin):
     assert body["verdicts"]["abnormal"] == 2 and body["verdicts"]["finalNormal"] == 3
     assert {"label": "Benign", "flows": 1, "cancelled": True} in body["verdicts"]["guesses"]
 
-    # only the confirmed abnormal flow became an incident, with its guesses kept
+    # only the confirmed abnormal flow became an incident; its stored guesses are the LIVE breakdown
+    # (every attack's exact share of the window) — DDoS was 1 of 4 flows = 25%.
     async with AsyncSessionLocal() as db:
         events = (await db.execute(select(SecurityEvent))).scalars().all()
     assert len(events) == 1 and events[0].attack_guesses[0]["label"] == "DDoS"
 
-    # the incident is worded as abnormal traffic with a possible attack
+    # the incident is worded as abnormal traffic with the attack at its real % of traffic
     event = (await client.get("/api/events", headers=headers)).json()["data"][0]
-    assert event["attackGuesses"][0] == {"label": "DDoS", "probability": 0.97}
+    assert event["attackGuesses"][0] == {"label": "DDoS", "probability": 0.25}
     feed = (await client.get("/api/notifications", headers=headers)).json()
-    assert feed[0]["verdict"] == "abnormal" and feed[0]["possibleAttack"] == "DDoS (97%)"
+    assert feed[0]["verdict"] == "abnormal" and feed[0]["possibleAttack"] == "DDoS (25%)"
     assert feed[0]["message"].startswith("Abnormal traffic detected from")
 
 
@@ -90,7 +95,66 @@ async def test_counters_restart_with_the_ids():
     assert ids.verdict_summary()["scored"] == 1
     ids.reset_verdicts()
     assert ids.verdict_summary() == {"scored": 0, "normal": 0, "abnormal": 0, "guesses": [],
-                                     "final_normal": 0, "final_abnormal": 0}
+                                     "final_normal": 0, "final_abnormal": 0,
+                                     "recent": [], "recent_total": 0, "recent_abnormal_pct": 0.0,
+                                     "trend": []}
+
+
+async def test_history_first_row_1_min_in_then_every_5_min():
+    """While abnormal, History writes the FIRST majority-attack row ~1 min into the incident, then a
+    new row every 5 minutes — not on every flow in between."""
+    import time as _t
+    from tests.test_ids import FakeDetector
+
+    ids = IDSService()
+    ids.detector = FakeDetector(Detection(0.95, True, "DDoS", 0.99))
+    ids._abnormal_now = True
+    ids._majority_attack = "DDoS"
+
+    # episode just started -> too early (< 1 min) -> nothing written yet
+    ids._abn_episode_started_at = _t.time()
+    ids._abn_stored_this_episode = False
+    assert await ids.process_flow(make_flow()) is None
+
+    # 1 min into the episode -> the first majority row is written
+    ids._abn_episode_started_at = _t.time() - 61
+    assert await ids.process_flow(make_flow()) is not None
+    # a few seconds later, same 5-min window -> no new row
+    assert await ids.process_flow(make_flow()) is None
+
+    # 5 minutes after the last row -> a new row is written
+    ids._last_store_time = _t.time() - 301
+    assert await ids.process_flow(make_flow()) is not None
+
+    async with AsyncSessionLocal() as db:
+        n = (await db.execute(select(func.count()).select_from(SecurityEvent))).scalar_one()
+    assert n == 2
+
+
+async def test_abnormal_count_today_increments_once_per_episode(monkeypatch):
+    """Today's abnormal count: +1 when the network goes normal->abnormal (slope up), no change while
+    it stays abnormal (slope flat), +1 again when it drops and rises again (down then up)."""
+    ids = IDSService()
+
+    async def _noop(*a, **k):
+        pass
+    monkeypatch.setattr(ids, "_send_desktop_abnormal", _noop)   # avoid desktop/email side effects
+
+    def summary(pct):
+        recent = [{"label": "DDoS", "flows": 9, "pct": pct}] if pct else []
+        return {"recent": recent, "recent_total": 10, "recent_abnormal_pct": pct}
+
+    monkeypatch.setattr(ids, "verdict_summary", lambda: summary(90))   # slope up
+    await ids._evaluate_abnormal_state()
+    assert ids.get_status()["abnormal_events_today"] == 1
+    await ids._evaluate_abnormal_state()                              # still abnormal -> no change
+    assert ids.get_status()["abnormal_events_today"] == 1
+
+    monkeypatch.setattr(ids, "verdict_summary", lambda: summary(0))    # slope down (back to normal)
+    await ids._evaluate_abnormal_state()
+    monkeypatch.setattr(ids, "verdict_summary", lambda: summary(90))   # slope up again -> new episode
+    await ids._evaluate_abnormal_state()
+    assert ids.get_status()["abnormal_events_today"] == 2
 
 
 def test_possible_attack_wording():
@@ -104,14 +168,16 @@ def test_possible_attack_wording():
 
 
 async def test_attack_storm_cannot_flood_the_database(monkeypatch):
-    monkeypatch.setattr(settings, "ALERT_STORE_MAX_PER_SOURCE_PER_MINUTE", 5)
+    # History gets ONE entry per abnormal episode, so a 40-flow attack burst cannot flood the DB:
+    # only the first majority flow of the episode is stored.
     ids = IDSService()
     ids.detector = SequenceDetector([ddos() for _ in range(40)])
+    ids._abnormal_now = True
+    ids._majority_attack = "DDoS"
     await ids.process_flows([make_flow() for _ in range(40)])
     async with AsyncSessionLocal() as db:
         stored = (await db.execute(select(func.count()).select_from(SecurityEvent))).scalar_one()
-    assert stored == 5
-    assert ids.alerts_not_stored == 35
+    assert stored == 1
     assert ids.verdict_summary()["final_abnormal"] == 40      # still counted in the tables
 
 
@@ -227,4 +293,4 @@ def test_csv_export_cannot_run_formulas():
     event.state, event.action_taken = EventState.ACTIVE, ActionTaken.ALERTED
     text = exporters.to_csv([event]).decode("utf-8-sig")
     assert "'=HYPERLINK" in text and "'@SUM(A1)" in text and "'+1" in text and "'-2+3" in text
-    assert "Abnormal traffic detected" in text and "Possible Attack" in text
+    assert "Abnormal traffic detected" in text and "Top Attack" in text

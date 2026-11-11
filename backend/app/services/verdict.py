@@ -15,6 +15,21 @@ NORMAL = "Normal traffic"
 UNKNOWN_GUESS = "Unknown"
 BENIGN_NAMES = {"benign", "normal"}
 
+# DISPLAY-ONLY renaming: the model class stays "Brute Force -XSS" internally (so detection,
+# counting and all logic are unchanged); it is only SHOWN to the user as "Cross Site Scripting".
+# Add more {internal label (lowercased): shown name} pairs here if other labels need friendly names.
+DISPLAY_NAMES = {
+    "brute force -xss": "Cross Site Scripting",
+    "brute force-xss": "Cross Site Scripting",
+}
+
+
+def pretty_label(label: Optional[str]) -> str:
+    """Map an internal model class name to the name shown to the user (display only)."""
+    if not label:
+        return label or ""
+    return DISPLAY_NAMES.get(label.strip().lower(), label)
+
 
 def clean_guesses(guesses) -> List[Dict]:
     """Stored guesses → [{label, probability}] (bad entries dropped, best first)."""
@@ -31,14 +46,15 @@ def clean_guesses(guesses) -> List[Dict]:
 def possible_attack(attack_type: Optional[str], confidence: Optional[float], guesses=None) -> str:
     """The model's best guess at which attack it might be, e.g. "DDoS (97%)"."""
     if attack_type:
-        return f"{attack_type} ({confidence:.0%})" if confidence is not None else attack_type
+        name = pretty_label(attack_type)
+        return f"{name} ({confidence:.0%})" if confidence is not None else name
     for g in clean_guesses(guesses):
         if g["label"].lower() not in BENIGN_NAMES:
-            return f"{g['label']} ({g['probability']:.0%}, unsure)"
+            return f"{pretty_label(g['label'])} ({g['probability']:.0%}, unsure)"
     return UNKNOWN_GUESS
 
 
 def guesses_text(guesses: Iterable[Dict], limit: int = 4) -> str:
     """"DDoS 97%, DoS 2%, Benign 1%" (guesses under 1 % left out)."""
     items = [g for g in clean_guesses(guesses) if g["probability"] >= 0.01][:limit]
-    return ", ".join(f"{g['label']} {g['probability']:.0%}" for g in items) or "-"
+    return ", ".join(f"{pretty_label(g['label'])} {g['probability']:.0%}" for g in items) or "-"

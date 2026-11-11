@@ -5,7 +5,6 @@ Pydantic models for auth request/response validation.
 These match the frontend TypeScript interfaces (camelCase on the wire).
 """
 
-import re
 from typing import Optional
 
 from pydantic import EmailStr, Field, field_validator, model_validator
@@ -27,7 +26,6 @@ class UserResponse(CamelModel):
     created_at: UtcDatetime
     last_login_at: Optional[UtcDatetime] = None
     avatar_url: Optional[str] = None
-    phone_number: Optional[str] = None
     email_alerts: bool = True
 
 
@@ -44,20 +42,10 @@ class LoginRequest(CamelModel):
     password: str = Field(..., min_length=1)
 
 
-def normalize_phone(value: str) -> str:
-    """Keep digits (and a leading +); 7-15 digits as in E.164."""
-    raw = value.strip()
-    digits = re.sub(r"[\s().-]", "", raw)
-    if not re.fullmatch(r"\+?\d{7,15}", digits):
-        raise ValueError("Enter a valid phone number (7-15 digits, optional country code with +)")
-    return digits
-
-
 class SignupRequest(CamelModel):
     """Step 1 of registration: who you are. A code is emailed to `email`."""
     full_name: str = Field(..., min_length=2, max_length=255)
     email: EmailStr
-    phone_number: str = Field(..., max_length=32)
 
     @field_validator("full_name")
     @classmethod
@@ -66,11 +54,6 @@ class SignupRequest(CamelModel):
         if len(value) < 2:
             raise ValueError("Full name must be at least 2 characters")
         return value
-
-    @field_validator("phone_number")
-    @classmethod
-    def valid_phone(cls, value: str) -> str:
-        return normalize_phone(value)
 
 
 class CompleteSignupRequest(CamelModel):
@@ -123,7 +106,6 @@ class RefreshRequest(CamelModel):
 class ProfileChangeRequest(CamelModel):
     """Change your own details; only fields that differ are changed (after an emailed code)."""
     full_name: Optional[str] = Field(None, max_length=255)
-    phone_number: Optional[str] = Field(None, max_length=32)
     email: Optional[EmailStr] = None
 
     @field_validator("full_name")
@@ -135,11 +117,6 @@ class ProfileChangeRequest(CamelModel):
         if len(value) < 2:
             raise ValueError("Full name must be at least 2 characters")
         return value
-
-    @field_validator("phone_number")
-    @classmethod
-    def _phone(cls, value: Optional[str]) -> Optional[str]:
-        return normalize_phone(value) if value is not None else None
 
 
 class ProfileChangeStarted(CamelModel):
@@ -168,6 +145,12 @@ class LoginVerifyRequest(CamelModel):
 
 class LoginResendRequest(CamelModel):
     login_token: str = Field(..., min_length=10)
+
+
+class LogoutConfirm(CamelModel):
+    """Logging out needs the account password, so an attacker on an open session
+    cannot sign out to stop detection/protection."""
+    password: str = Field(..., min_length=1)
 
 
 class ChangePasswordRequest(CamelModel):

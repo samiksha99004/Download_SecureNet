@@ -60,12 +60,14 @@ async def get_events(
     """Paginated list of security events with filtering and sorting (cached until events change)."""
     where = combine(filters.conditions())          # validates the filters (400 on bad values)
     order = sort_clause(sortBy, sortOrder)
-    key = "events:list:" + "|".join(map(str, (page, pageSize, sortBy, sortOrder, *vars(filters).values())))
+    owner_id = current_user.id
+    owned = SecurityEvent.owner_id == owner_id      # each account sees only its own events
+    key = f"events:list:{owner_id}:" + "|".join(map(str, (page, pageSize, sortBy, sortOrder, *vars(filters).values())))
 
     async def load() -> PaginatedResponse[SecurityEventResponse]:
         async with AsyncSessionLocal() as db:
-            count_q = select(func.count()).select_from(SecurityEvent)
-            query = select(SecurityEvent)
+            count_q = select(func.count()).select_from(SecurityEvent).where(owned)
+            query = select(SecurityEvent).where(owned)
             if where is not None:
                 count_q = count_q.where(where)
                 query = query.where(where)
@@ -93,7 +95,7 @@ async def export_events(
     db: AsyncSession = Depends(get_db),
 ):
     """Export the events matching the current filters (max 50,000 rows)."""
-    query = select(SecurityEvent)
+    query = select(SecurityEvent).where(SecurityEvent.owner_id == current_user.id)
     if (where := combine(filters.conditions())) is not None:
         query = query.where(where)
     query = query.order_by(sort_clause(sortBy, sortOrder)).limit(EXPORT_LIMIT)
@@ -115,12 +117,15 @@ async def export_events(
     )
 
 
-async def _get_event(db: AsyncSession, event_id: str) -> SecurityEvent:
+async def _get_event(db: AsyncSession, event_id: str, owner_id: str) -> SecurityEvent:
     try:
         event_uuid = uuid.UUID(event_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid event ID format")
-    event = (await db.execute(select(SecurityEvent).where(SecurityEvent.id == event_uuid))).scalar_one_or_none()
+    # Scoped to the owner: a user cannot read or change another account's event.
+    event = (await db.execute(
+        select(SecurityEvent).where(SecurityEvent.id == event_uuid, SecurityEvent.owner_id == owner_id)
+    )).scalar_one_or_none()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     return event
@@ -133,11 +138,11 @@ async def get_event_by_id(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single security event by ID"""
-    return convert_event_to_response(await _get_event(db, event_id))
+    return convert_event_to_response(await _get_event(db, event_id, current_user.id))
 
 
 async def _set_state(db: AsyncSession, event_id: str, state: EventState, user: User) -> None:
-    event = await _get_event(db, event_id)
+    event = await _get_event(db, event_id, user.id)
     now = utcnow()
     event.state = state
     event.resolved_at = now

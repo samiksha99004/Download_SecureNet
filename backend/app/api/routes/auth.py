@@ -10,6 +10,7 @@ import secrets
 import string
 import uuid
 from datetime import timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select, update
@@ -39,6 +40,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.base import get_db
+from app.services import active_session
 from app.models.otp import OTP
 from app.models.user import AccountStatus, AuthProvider, User, UserRole
 from app.schemas.auth import (
@@ -52,6 +54,7 @@ from app.schemas.auth import (
     LoginRequest,
     LoginResendRequest,
     LoginVerifyRequest,
+    LogoutConfirm,
     OtpResendRequest,
     OtpVerifyRequest,
     OtpVerifyResponse,
@@ -98,14 +101,25 @@ def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def create_auth_response(user: User) -> AuthResponse:
-    """Create authentication response with a fresh token pair"""
+def create_auth_response(user: User, sid: Optional[str] = None) -> AuthResponse:
+    """Create authentication response with a fresh token pair.
+
+    `sid` is the single-session id embedded in the tokens. On sign-in it is left None so a NEW
+    session starts (signing out every other browser); on token refresh the caller passes the
+    still-current sid so the session is kept (not rotated)."""
     remember_user(user)   # the dashboard that opens next needs no user lookup
+    if sid is None:
+        sid = active_session.start(str(user.id))   # new sign-in: become the one active session
+    try:
+        from app.ml.ids_service import get_ids_service   # lazy: avoid an import cycle
+        get_ids_service().set_active_owner(str(user.id))  # this account now owns new detections + alerts
+    except Exception as exc:
+        logger.warning(f"Could not set IDS active owner for {user.email}: {exc}")
     return AuthResponse(
         user=UserResponse.model_validate(user),
         tokens=AuthTokens(
-            access_token=create_access_token(data={"sub": str(user.id)}),
-            refresh_token=create_refresh_token(data={"sub": str(user.id)}),
+            access_token=create_access_token(data={"sub": str(user.id), "sid": sid}),
+            refresh_token=create_refresh_token(data={"sub": str(user.id), "sid": sid}),
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         ),
     )
@@ -186,7 +200,7 @@ def _email_failure_detail() -> str:
 
 @router.post("/signup", response_model=MessageResponse)
 async def signup(request: SignupRequest, http: Request, db: AsyncSession = Depends(get_db)):
-    """Registration step 1: full name, email and phone number -> a code is emailed.
+    """Registration step 1: full name and email -> a code is emailed.
 
     Steps 2-3 are /otp/verify (code) and /signup/complete (password). The
     account only becomes usable once the password is set.
@@ -200,13 +214,11 @@ async def signup(request: SignupRequest, http: Request, db: AsyncSession = Depen
     if existing:
         # Unfinished registration: refresh the details and send a new code.
         existing.full_name = request.full_name
-        existing.phone_number = request.phone_number
         existing.password_hash = None
     else:
         db.add(User(
             email=email,
             full_name=request.full_name,
-            phone_number=request.phone_number,
             password_hash=None,
             role=UserRole.VIEWER,  # decided when the account is completed
             account_status=AccountStatus.PENDING_VERIFICATION,
@@ -506,14 +518,52 @@ async def refresh_tokens(request: RefreshRequest, db: AsyncSession = Depends(get
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None or user.account_status != AccountStatus.ACTIVE:
         raise unauthorized
-    return create_auth_response(user)
+    # Single session: the refresh token must belong to the CURRENT session (another sign-in has
+    # not replaced it). If so, keep that session (don't rotate it); otherwise this browser is out.
+    sid = payload.get("sid")
+    if not active_session.is_valid(sid):
+        raise unauthorized
+    return create_auth_response(user, sid=sid)
+
+
+async def _stop_ids_for_logout(email: str) -> None:
+    """Logging out turns monitoring OFF: stop detection, drop any protection blocks,
+    and remember OFF so it does not auto-start again at the next sign-in."""
+    from app.ml.ids_service import get_ids_service        # lazy: avoid an import cycle
+    from app.services.autostart import remember_ids_state
+    ids = get_ids_service()
+    try:
+        if ids.enabled:
+            await ids.stop()            # stops capture/detection and unblocks protection
+            ids.started_by = None
+        await remember_ids_state(False)  # don't come back on at the next start
+        logger.info(f"IDS + protection turned off on logout by: {email}")
+    except Exception as exc:            # logout must still succeed even if the IDS hiccups
+        logger.error(f"Could not fully stop IDS on logout for {email}: {exc}")
 
 
 @router.post("/logout", response_model=MessageResponse)
-async def logout(current_user: User = Depends(get_current_user)):
-    """Logout (tokens are discarded client-side)."""
-    logger.info(f"User logged out: {current_user.email}")
-    return MessageResponse(message="Logged out successfully")
+async def logout(
+    request: LogoutConfirm,
+    http: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Sign out: confirm with the account password.
+
+    On success monitoring is turned OFF (detection + Advanced Protection) and the
+    session tokens are discarded client-side. The password is required so an
+    attacker who reached an open session cannot sign out to disable the IDS.
+    """
+    if not current_user.password_hash or not await asyncio.to_thread(
+        verify_password, request.password, current_user.password_hash
+    ):
+        ratelimit.enforce("login-fail", http)
+        ratelimit.record("login-fail", http)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+    await _stop_ids_for_logout(current_user.email)
+    active_session.invalidate()      # end the single session so the discarded token can't be reused
+    logger.info(f"User logged out (password confirmed): {current_user.email}")
+    return MessageResponse(message="Logged out. Detection and protection are now off.")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -538,9 +588,9 @@ async def update_preferences(
     return UserResponse.model_validate(user)
 
 
-# ── Change your own details (name / phone / email) — confirmed by an emailed code ──
+# ── Change your own details (name / email) — confirmed by an emailed code ──
 
-PROFILE_FIELDS = {"full_name": "name", "phone_number": "phone number", "email": "email address"}
+PROFILE_FIELDS = {"full_name": "name", "email": "email address"}
 
 
 def _mask(email: str) -> str:
@@ -559,8 +609,6 @@ async def request_profile_change(
     changes: dict[str, str] = {}
     if request.full_name is not None and request.full_name != current_user.full_name:
         changes["full_name"] = request.full_name
-    if request.phone_number is not None and request.phone_number != (current_user.phone_number or ""):
-        changes["phone_number"] = request.phone_number
     if request.email is not None:
         new_email = normalize_email(request.email)
         if new_email != normalize_email(current_user.email):
@@ -619,7 +667,7 @@ async def confirm_profile_change(
             await db.commit()  # keep the used code used
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="This email is already used by another account.")
-    for field in ("full_name", "phone_number", "email"):
+    for field in ("full_name", "email"):
         if field in changes:
             setattr(user, field, changes[field])
     await db.commit()
@@ -644,14 +692,12 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update name / phone / email directly — the input is validated and saved at once
-    (no emailed code). The schema already checks the phone/email format ("verify"),
+    """Update name / email directly — the input is validated and saved at once
+    (no emailed code). The schema already checks the email format ("verify"),
     and a changed email is still checked for uniqueness. The old address is notified."""
     changes: dict[str, str] = {}
     if request.full_name is not None and request.full_name != current_user.full_name:
         changes["full_name"] = request.full_name
-    if request.phone_number is not None and request.phone_number != (current_user.phone_number or ""):
-        changes["phone_number"] = request.phone_number
     if request.email is not None:
         new_email = normalize_email(request.email)
         if new_email != normalize_email(current_user.email):
@@ -669,7 +715,7 @@ async def update_profile(
         if taken:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="This email is already used by another account.")
-    for field in ("full_name", "phone_number", "email"):
+    for field in ("full_name", "email"):
         if field in changes:
             setattr(user, field, changes[field])
     await db.commit()

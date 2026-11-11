@@ -3,7 +3,7 @@
  */
 
 import type { NotificationItem } from '../types/notifications.types';
-import { ABNORMAL_TRAFFIC } from './verdict';
+import { ABNORMAL_TRAFFIC, prettyLabel } from './verdict';
 
 /** Display title of an alert: the verdict (the attack is only the model's guess). */
 export function titleOf(_item?: Pick<NotificationItem, 'attackType'>): string {
@@ -14,5 +14,6 @@ export function titleOf(_item?: Pick<NotificationItem, 'attackType'>): string {
 export function guessOf(item: Pick<NotificationItem, 'attackType' | 'possibleAttack' | 'confidence'>): string {
   if (item.possibleAttack) return item.possibleAttack;
   if (!item.attackType) return 'Unknown';
-  return item.confidence != null ? `${item.attackType} (${Math.round(item.confidence * 100)}%)` : item.attackType;
+  const name = prettyLabel(item.attackType);
+  return item.confidence != null ? `${name} (${Math.round(item.confidence * 100)}%)` : name;
 }

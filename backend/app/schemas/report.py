@@ -7,9 +7,12 @@ from typing import Optional
 from app.schemas.base import CamelModel, UtcDatetime
 
 
-class DailyReport(CamelModel):
-    """One day (local time) that had detected attacks — shown as a box on the Reports page."""
-    date: str                    # YYYY-MM-DD, local calendar day
+class ReportWindow(CamelModel):
+    """One 6-hour window (local time) that had detected attacks — a box on the Reports page.
+    A window's report appears only AFTER the window has ended; windows with no attack are skipped."""
+    key: str                     # window start "YYYY-MM-DDTHH" (local), the download id
+    date: str                    # local date "YYYY-MM-DD"
+    range_label: str             # e.g. "12:00 am - 6:00 am"
     total: int
     high: int
     medium: int

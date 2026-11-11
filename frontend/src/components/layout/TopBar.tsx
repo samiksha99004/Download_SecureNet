@@ -10,12 +10,13 @@
  *  - Logout button
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConnectionIndicator } from './ConnectionIndicator';
 import { NotificationBell } from '../notifications/NotificationBell';
+import { LogoutDialog } from '../common/LogoutDialog';
 import { useGreeting } from '../../utils/greeting';
 import styles from './TopBar.module.css';
 
@@ -26,14 +27,15 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, greet = false, onMenuClick }: TopBarProps) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const greeting = useGreeting();
   const navigate = useNavigate();
+  const [showLogout, setShowLogout] = useState(false);
 
-  const handleLogout = useCallback(async () => {
-    await logout();
+  const handleLoggedOut = useCallback(() => {
+    setShowLogout(false);
     navigate('/login', { replace: true });
-  }, [logout, navigate]);
+  }, [navigate]);
 
   return (
     <header className={styles.topbar} role="banner">
@@ -71,13 +73,19 @@ export function TopBar({ title, greet = false, onMenuClick }: TopBarProps) {
 
         <button
           className={styles.logoutButton}
-          onClick={handleLogout}
+          onClick={() => setShowLogout(true)}
           aria-label="Sign out"
           title="Sign out"
         >
           <LogOut size={16} />
         </button>
       </div>
+
+      <LogoutDialog
+        isOpen={showLogout}
+        onClose={() => setShowLogout(false)}
+        onLoggedOut={handleLoggedOut}
+      />
     </header>
   );
 }

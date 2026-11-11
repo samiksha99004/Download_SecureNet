@@ -11,10 +11,15 @@ from tests.conftest import register
 
 
 async def seed_events(n: int = 25):
+    import uuid as _uuid
+    from app.ml.ids_service import get_ids_service
+    oid = get_ids_service().active_owner_id
+    owner = _uuid.UUID(oid) if oid else None            # the account that is "logged in"
     async with AsyncSessionLocal() as db:
         for i in range(n):
             db.add(SecurityEvent(
                 timestamp=utcnow() - timedelta(minutes=i),
+                owner_id=owner,
                 source_ip=f"10.0.0.{i % 5}",
                 source_port=40000 + i,
                 destination_ip="192.168.1.10",
@@ -82,7 +87,8 @@ async def test_securenet_user_can_switch_ids_but_nothing_else(client, admin, cap
     monkeypatch.setattr(ids, "stop", fake_stop)
     monkeypatch.setattr(network_monitor, "check_capture_available", lambda *a, **k: None)
     r = await client.post("/api/ids/control", headers=headers, json={"enabled": True})
-    assert r.status_code == 200 and calls == [("start", "monitor")]
+    # No mode in the request => start(None); start() then uses the saved Advanced Protection choice.
+    assert r.status_code == 200 and calls == [("start", None)]
 
     denied = [
         client.put("/api/settings/detection", headers=headers, json={"anomalyThreshold": 0.9}),

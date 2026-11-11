@@ -26,6 +26,12 @@ os.environ["IDS_STATE_FILE"] = str(_TMP / "ids-state.json")
 os.environ["IDS_STARTUP_DIR"] = str(_TMP / "startup")
 os.environ["DESKTOP_NOTIFICATIONS"] = "false"
 os.environ["IDS_ON_AT_STARTUP"] = "false"   # tests start the IDS themselves
+# Use the in-process scapy/NetworkMonitor capture path in tests (the real .env uses the
+# external WinDivert+CICFlowMeter "local_csv" pipeline, which needs Admin and spawns a
+# subprocess). Tests mock NetworkMonitor / capture availability, so force this path.
+os.environ["CAPTURE_SOURCE"] = "scapy"
+os.environ["ALERT_EMAIL_INTERVAL_SECONDS"] = "300"   # deterministic email spacing in tests
+os.environ["SINGLE_SESSION_ENFORCED"] = "false"      # tests use several users' tokens at once
 os.environ["ALLOWED_HOSTS"] = "localhost,127.0.0.1,::1,test,testserver"
 
 import pytest  # noqa: E402
@@ -73,6 +79,16 @@ def _reset_rate_limits():
     limiter.reset()
 
 
+@pytest.fixture(autouse=True)
+def _reset_active_owner():
+    """The IDS 'active owner' (who owns new detections) is process-wide and persisted; clear it
+    before each test so ownership never leaks between tests."""
+    from app.ml.ids_service import get_ids_service
+    get_ids_service().set_active_owner(None)
+    yield
+    get_ids_service().set_active_owner(None)
+
+
 @pytest.fixture
 def captured_otps(monkeypatch):
     """Capture OTP codes instead of emailing/logging them."""
@@ -93,10 +109,9 @@ def captured_otps(monkeypatch):
     return codes
 
 
-async def register(client, captured_otps, email="admin@example.com", password="Passw0rd!", name="Admin",
-                   phone="+919876543210"):
+async def register(client, captured_otps, email="admin@example.com", password="Passw0rd!", name="Admin"):
     """Full registration: details -> emailed code -> password. Returns the auth response JSON."""
-    r = await client.post("/api/auth/signup", json={"fullName": name, "email": email, "phoneNumber": phone})
+    r = await client.post("/api/auth/signup", json={"fullName": name, "email": email})
     assert r.status_code == 200, r.text
     r = await client.post("/api/auth/otp/verify", json={"email": email, "otp": captured_otps[email]})
     assert r.status_code == 200, r.text

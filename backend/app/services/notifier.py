@@ -39,7 +39,7 @@ from app.models.user import AccountStatus, User, UserRole
 from app.services.incident_report import render_text, report_filename, server_offset_minutes, to_local, tz_label
 from app.utils.email import Attachment, EmailDeliveryError, send_email
 from app.utils.logger import logger
-from app.services.verdict import ABNORMAL, guesses_text, possible_attack
+from app.services.verdict import ABNORMAL, guesses_text, possible_attack, pretty_label
 from app.utils.timeutil import parse_iso_utc, to_iso_z, utcnow
 
 SEVERITY_COLORS = {"high": "#dc2626", "medium": "#d97706", "low": "#059669"}
@@ -62,11 +62,13 @@ class AlertInfo:
     reason: Optional[str]
     confidence: Optional[float] = None
     guesses: Optional[list] = None
+    owner_id: Optional[str] = None
 
     @classmethod
     def from_event(cls, e: SecurityEvent) -> "AlertInfo":
         return cls(
             event_id=str(e.id),
+            owner_id=str(e.owner_id) if e.owner_id else None,
             timestamp=to_iso_z(e.timestamp),
             severity=e.severity.value,
             attack_type=e.attack_type,
@@ -102,16 +104,28 @@ def wanted(alert: AlertInfo, prefs: NotificationSettings) -> bool:
     )
 
 
-async def get_recipients(db, prefs: Optional[NotificationSettings]) -> List[str]:
-    """Who gets attack emails: every active SecureNet user who has them switched on, plus
-    the optional extra address from Settings. Admins never do — the admin sends the alerts
-    (from SMTP_USER); an extra address that belongs to an admin is ignored too."""
-    users = (await db.execute(
-        select(User.email, User.role, User.email_alerts).where(User.account_status == AccountStatus.ACTIVE)
-    )).all()
-    # Abnormal-traffic alerts go to every active user who has email alerts on — INCLUDING admins
-    # (owner's request 2026-10-27: the admin account projectids99 must receive the alert too).
-    recipients = {email.strip().lower() for email, role, wants in users if email and wants}
+async def get_recipients(db, prefs: Optional[NotificationSettings], owner_id: Optional[str] = None) -> List[str]:
+    """Who gets attack emails, plus the optional extra address from Settings.
+
+    Per-account model: when `owner_id` is given (the account that owns the events, i.e. the user
+    who was logged in when they were detected), the alert goes ONLY to that account — so each user
+    gets their own attacks. Without an owner (e.g. a shared status view or events with no owner) it
+    falls back to every active account with email alerts on."""
+    if owner_id is not None:
+        try:
+            owner_uuid = uuid.UUID(str(owner_id))      # the User.id column is a UUID
+        except (TypeError, ValueError):
+            owner_uuid = None
+        row = (await db.execute(
+            select(User.email, User.email_alerts).where(
+                User.id == owner_uuid, User.account_status == AccountStatus.ACTIVE)
+        )).first() if owner_uuid else None
+        recipients = {row[0].strip().lower()} if (row and row[0] and row[1]) else set()
+    else:
+        users = (await db.execute(
+            select(User.email, User.email_alerts).where(User.account_status == AccountStatus.ACTIVE)
+        )).all()
+        recipients = {email.strip().lower() for email, wants in users if email and wants}
     if prefs is not None and prefs.email_address:
         recipients.add(prefs.email_address.strip().lower())
     return sorted(recipients)
@@ -179,84 +193,115 @@ def summarize_alerts(alerts: Sequence[AlertInfo]) -> dict:
 
 # what each kind of email says first
 EMAIL_KINDS = {
-    "new": ("Possible abnormal traffic",
-            "Around {first_clock}, SecureNet's model flagged some traffic as possibly abnormal. "
-            "The attack name below is the model's guess, not a confirmed attack."),
-    "continuing": ("Abnormal traffic still flagged",
-                   "SecureNet's model is still flagging traffic as possibly abnormal. This is a summary "
-                   "of the last few minutes."),
+    "new": ("Abnormal Network Found",
+            "SecureNet detected abnormal activity on your network. Below is the live traffic "
+            "breakdown — every class SecureNet saw and its share of recent traffic."),
+    "continuing": ("Abnormal Network Found",
+                   "SecureNet is still seeing abnormal activity on your network. Below is the live "
+                   "traffic breakdown of the last few minutes."),
     "digest": ("Security summary", "A summary of the traffic SecureNet recently flagged as possibly abnormal."),
     "test": ("Test alert", "This is a test. Email alerts from SecureNet are working."),
 }
 
 
-def render_alert_email(alerts: Sequence[AlertInfo], kind: str = "new") -> tuple[str, str]:
-    """(text, html) of an alert email: a short, plain summary — what happened, the most likely
-    attack, how many alerts, when — and one button. Every detail of every alert is in the
-    attached incident report, ready to print."""
+def _is_benign(label: str) -> bool:
+    return (label or "").lower() in ("benign", "normal")
+
+
+def breakdown_lines(breakdown: Optional[Sequence[dict]]) -> list[str]:
+    """Plain-text rows of the dashboard's live breakdown: every class with its %, biggest first."""
+    rows: list[str] = []
+    for r in (breakdown or []):
+        raw = str(r.get("label", "?"))
+        label = pretty_label(raw)            # display name only
+        pct = float(r.get("pct", 0.0))
+        tag = "" if _is_benign(raw) else "  (attack)"
+        rows.append(f"  {label:<28} {pct:5.1f}%{tag}")
+    return rows
+
+
+def render_alert_email(alerts: Sequence[AlertInfo], kind: str = "new",
+                       breakdown: Optional[Sequence[dict]] = None,
+                       abnormal_pct: Optional[float] = None) -> tuple[str, str]:
+    """(text, html) of an alert email. Headline: ABNORMAL NETWORK FOUND. The body lists the live
+    dashboard breakdown — every traffic class and its share, even 0.1% — instead of a single
+    (often wrong) attack guess. Every per-flow detail is still in the attached incident report."""
     info = summarize_alerts(alerts)
     title, intro = EMAIL_KINDS.get(kind, EMAIL_KINDS["new"])
-    intro = intro.format(**info)
     app = _esc(settings.APP_NAME)
-    alerts_line = f"{info['total']} alert{'' if info['total'] == 1 else 's'}"
-    split = " · ".join(f"{n} {label}" for n, label in
-                       ((info["high"], "high"), (info["medium"], "medium"), (info["low"], "low")) if n)
-    guess_note = ("" if info["total"] == 1
-                  else f" (in {info['attack_count']} of {info['total']} alerts)")
     interval_min = max(1, settings.ALERT_EMAIL_INTERVAL_SECONDS // 60)
     link = f"{settings.DASHBOARD_URL}/history"
-    color = SEVERITY_COLORS.get(info["worst"], "#c2562f")
+    pct_line = f"Attacks were {abnormal_pct:.1f}% of recent traffic." if abnormal_pct is not None else ""
+    b_lines = breakdown_lines(breakdown)
 
     text = "\n".join([
-        f"{settings.APP_NAME}: {title}",
+        f"{settings.APP_NAME}: ABNORMAL NETWORK FOUND",
         "",
         intro,
+        pct_line,
         "",
-        f"Model's guess   : {info['attack']}{guess_note} - a guess, may be a false positive",
-        f"Flags           : {alerts_line}" + (f" ({split})" if split else ""),
-        f"When            : {info['when']}",
-        f"Involving       : {info['source']}",
+        "LIVE TRAFFIC BREAKDOWN (same as the dashboard — every class, even 0.1%):",
+        *(b_lines or ["  (breakdown not available)"]),
         "",
-        "Note: on normal internet traffic some flags are false positives (e.g. ordinary HTTPS to a",
-        "web service). Treat each as a lead to verify, not a confirmed attack.",
+        f"When      : {info['when']}",
+        f"Involving : {info['source']}",
         "",
-        "The full report is attached - open or print it for every detail.",
-        f"See each flag in SecureNet: {link}",
+        "The percentages above are the model's per-flow guesses; on normal internet traffic some",
+        "are false positives. Treat each as a lead to verify, not a confirmed attack.",
+        "",
+        "The full per-flow report is attached - open or print it for every detail.",
+        f"See it in SecureNet: {link}",
         "",
         f"You get at most one alert email every {interval_min} minutes. Alerts on your screen are not affected.",
     ])
 
-    def row(label: str, value: str) -> str:
-        return (f'<tr><td style="padding:6px 16px 6px 0;color:#59636e;font-size:14px;white-space:nowrap;'
-                f'vertical-align:top">{_esc(label)}</td>'
-                f'<td style="padding:6px 0;font-size:14px;color:#1f2328">{value}</td></tr>')
+    def brow(r: dict) -> str:
+        raw = str(r.get("label", "?"))
+        label = pretty_label(raw)            # display name only
+        pct = float(r.get("pct", 0.0))
+        benign = _is_benign(raw)
+        color = "#059669" if benign else "#dc2626"
+        bar = max(2, min(100, round(pct)))
+        return (
+            '<tr>'
+            f'<td style="padding:4px 10px 4px 0;font-size:14px;color:#1f2328;white-space:nowrap">'
+            f'{_esc(label)}{"" if benign else " <span style=\'color:#dc2626;font-size:11px\'>attack</span>"}</td>'
+            f'<td style="padding:4px 0;width:100%">'
+            f'<div style="background:#eef1f6;border-radius:6px;height:10px"><div style="background:{color};'
+            f'height:10px;border-radius:6px;width:{bar}%"></div></div></td>'
+            f'<td style="padding:4px 0 4px 10px;font-size:14px;font-weight:bold;color:{color};text-align:right;'
+            f'white-space:nowrap">{pct:.1f}%</td></tr>'
+        )
 
-    rows = "".join([
-        row("Model's guess", f"<b>{_esc(info['attack'])}</b>{_esc(guess_note)}"
-            f'<br><span style="color:#8c959f;font-size:12px">a guess &ndash; may be a false positive</span>'),
-        row("Flags", f"{_esc(alerts_line)}" + (f' <span style="color:#59636e">({_esc(split)})</span>' if split else "")),
-        row("When", _esc(info["when"])),
-        row("Involving", _esc(info["source"])),
-    ])
+    brows = "".join(brow(r) for r in (breakdown or [])) or (
+        '<tr><td style="font-size:14px;color:#8c959f">Breakdown not available.</td></tr>')
+
+    def irow(label: str, value: str) -> str:
+        return (f'<tr><td style="padding:4px 16px 4px 0;color:#59636e;font-size:13px;white-space:nowrap">'
+                f'{_esc(label)}</td><td style="padding:4px 0;font-size:13px;color:#1f2328">{value}</td></tr>')
+
     body = f"""<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1f2328">
-<div style="display:none;max-height:0;overflow:hidden">{_esc(title)}: most likely {_esc(info['attack'])}, {_esc(alerts_line)}</div>
+<div style="display:none;max-height:0;overflow:hidden">Abnormal network found{(" — attacks " + format(abnormal_pct, ".0f") + "% of recent traffic") if abnormal_pct is not None else ""}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
   <tr><td align="center" style="padding:24px 12px">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
-      <tr><td style="font-size:20px;font-weight:bold;color:#c2562f;padding:0 0 4px">&#128737; {app}</td></tr>
-      <tr><td style="font-size:22px;padding:4px 0 8px">{_esc(title)}</td></tr>
-      <tr><td style="font-size:14px;line-height:1.5;color:#3d444d;padding:0 0 16px">{_esc(intro)}</td></tr>
-      <tr><td style="background:#eef1f6;border-left:4px solid {color};border-radius:12px;padding:16px 20px">
-        <div style="display:inline-block;background:{color};color:#ffffff;font-size:12px;font-weight:bold;
-                    letter-spacing:0.05em;border-radius:999px;padding:4px 10px;margin:0 0 10px">POSSIBLE &ndash; MODEL'S GUESS</div>
-        <table role="presentation" cellpadding="0" cellspacing="0">{rows}</table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+      <tr><td style="font-size:20px;font-weight:bold;color:#c2562f;padding:0 0 8px">&#128737; {app}</td></tr>
+      <tr><td style="background:#fdeceb;border-left:5px solid #dc2626;border-radius:12px;padding:16px 20px">
+        <div style="font-size:24px;font-weight:bold;color:#b91c1c;letter-spacing:0.01em">ABNORMAL NETWORK FOUND</div>
+        {f'<div style="font-size:15px;color:#7f1d1d;padding-top:4px">{_esc(pct_line)}</div>' if pct_line else ''}
       </td></tr>
+      <tr><td style="font-size:14px;line-height:1.5;color:#3d444d;padding:16px 2px 12px">{_esc(intro)}</td></tr>
+      <tr><td style="padding:0 0 6px;font-size:12px;font-weight:bold;letter-spacing:0.05em;color:#59636e">
+        LIVE TRAFFIC BREAKDOWN (same as the dashboard)</td></tr>
+      <tr><td style="padding:0 0 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{brows}</table></td></tr>
+      <tr><td style="padding:10px 0 0"><table role="presentation" cellpadding="0" cellspacing="0">
+        {irow("When", _esc(info["when"]))}{irow("Involving", _esc(info["source"]))}</table></td></tr>
       <tr><td style="font-size:13px;line-height:1.5;padding:14px 2px 0;color:#8c959f">
-        On normal internet traffic some flags are false positives (e.g. ordinary HTTPS to a web service).
-        Treat each as a lead to verify, not a confirmed attack.</td></tr>
+        The percentages are the model's per-flow guesses; on normal internet traffic some are false
+        positives. Treat each as a lead to verify, not a confirmed attack.</td></tr>
       <tr><td style="font-size:14px;line-height:1.5;padding:14px 2px 0;color:#3d444d">
-        The full report is attached &mdash; open or print it for every detail.</td></tr>
+        The full per-flow report is attached &mdash; open or print it for every detail.</td></tr>
       <tr><td style="font-size:12px;line-height:1.5;color:#8c959f;padding:24px 2px 0;border-top:1px solid #e6e9ee">
         You get at most one alert email every {interval_min} minutes; alerts on your screen are not affected.
         To stop these emails: SecureNet &rarr; Settings &rarr; Preferences &rarr; Attack Alert Emails.<br>
@@ -268,12 +313,10 @@ def render_alert_email(alerts: Sequence[AlertInfo], kind: str = "new") -> tuple[
     return text, body
 
 
-def alert_subject(alerts: Sequence[AlertInfo], kind: str = "new") -> str:
-    info = summarize_alerts(alerts)
-    count = f"{info['total']} flag{'' if info['total'] == 1 else 's'}"
-    if kind == "continuing":
-        return f"[{settings.APP_NAME}] Possible abnormal traffic continues - {count}, model's guess {info['attack']}"
-    return f"[{settings.APP_NAME}] Possible abnormal traffic - model's guess {info['attack']} ({count})"
+def alert_subject(alerts: Sequence[AlertInfo], kind: str = "new",
+                  abnormal_pct: Optional[float] = None) -> str:
+    pct = f" - attacks {abnormal_pct:.0f}% of recent traffic" if abnormal_pct is not None else ""
+    return f"[{settings.APP_NAME}] Abnormal network found{pct}"
 
 
 # ── Notifier service ─────────────────────────────────────────────────────────
@@ -284,12 +327,13 @@ async def fetch_events(db, alerts: Sequence[AlertInfo]) -> List[SecurityEvent]:
     return sorted(events, key=lambda e: e.timestamp)
 
 
-def report_attachment(events: Sequence[SecurityEvent]) -> Attachment:
-    """Incident report (.txt) for the attacks in one alert email."""
+def report_attachment(events: Sequence[SecurityEvent], breakdown: Optional[Sequence[dict]] = None,
+                      abnormal_pct: Optional[float] = None) -> Attachment:
+    """Incident report (.txt) for the attacks in one alert email, with the live breakdown on top."""
     offset = server_offset_minutes()
     stamp = to_local(utcnow(), offset).strftime("%Y%m%d-%H%M%S")
-    title = f"Attack alert - {len(events)} incident(s)"
-    content = render_text(events, title, offset)
+    title = f"Abnormal network found - {len(events)} flagged flow(s)"
+    content = render_text(events, title, offset, breakdown=breakdown, abnormal_pct=abnormal_pct)
     return Attachment(report_filename("incident-report", stamp, "txt"), content.encode("utf-8"), "plain")
 
 
@@ -376,15 +420,30 @@ class AlertNotifier:
             alerts = [a for a in pending if wanted(a, prefs)]
             if not alerts:
                 return 0
-            recipients = await get_recipients(db, prefs)
+            # Per-account: the email goes to the account that owns these events (whoever was logged
+            # in when they were detected). One user is logged in at a time, so all share one owner.
+            owner_id = next((a.owner_id for a in alerts if a.owner_id), None)
+            recipients = await get_recipients(db, prefs, owner_id)
             if not recipients:
                 return 0
             events = await fetch_events(db, alerts)
 
+        # Live dashboard breakdown (every class + %, even 0.1%) — the email leads with this, not a
+        # single (often wrong) attack guess.
+        breakdown: List[dict] = []
+        abnormal_pct: Optional[float] = None
+        try:
+            from app.ml.ids_service import get_ids_service   # lazy: avoid import cycle
+            summary = get_ids_service().verdict_summary()
+            breakdown = list(summary.get("recent") or [])
+            abnormal_pct = summary.get("recent_abnormal_pct")
+        except Exception as exc:
+            logger.warning(f"Could not read live breakdown for alert email: {exc}")
+
         alerts.sort(key=lambda a: a.timestamp, reverse=True)
-        report = await asyncio.to_thread(report_attachment, events)
-        subject = alert_subject(alerts, kind)
-        text, body = render_alert_email(alerts, kind)
+        report = await asyncio.to_thread(report_attachment, events, breakdown, abnormal_pct)
+        subject = alert_subject(alerts, kind, abnormal_pct)
+        text, body = render_alert_email(alerts, kind, breakdown, abnormal_pct)
         mails = [(recipients, subject, text, body)]
         self._last_email_at = time.monotonic()
         for rcpts, subj, text, body in mails:
@@ -407,29 +466,41 @@ class AlertNotifier:
                 return
             self._last_digest = time.time()
             since = utcnow() - timedelta(seconds=interval)
-            events = (await db.execute(
-                select(SecurityEvent).where(SecurityEvent.timestamp >= since)
-                .order_by(SecurityEvent.timestamp.desc()).limit(settings.ALERT_EMAIL_MAX_EVENTS)
-            )).scalars().all()
-            total = (await db.execute(
-                select(func.count()).select_from(SecurityEvent).where(SecurityEvent.timestamp >= since)
-            )).scalar() or 0
-            recipients = await get_recipients(db, prefs)
-            alerts = [AlertInfo.from_event(e) for e in events]
-        if not recipients:
-            return
+            # Only the currently signed-in account (the active owner) gets mail. Its digest summarises
+            # ONLY its own events. If nobody is signed in, no digest is sent.
+            try:
+                from app.ml.ids_service import get_ids_service   # lazy: avoid import cycle
+                owner_id = get_ids_service().active_owner_id
+            except Exception:
+                owner_id = None
+            digests = []   # (email, alerts, total)
+            if owner_id:
+                row = (await db.execute(
+                    select(User.id, User.email).where(
+                        User.id == uuid.UUID(str(owner_id)), User.account_status == AccountStatus.ACTIVE,
+                        User.email_alerts.is_(True))
+                )).first()
+                if row and row[1]:
+                    events = (await db.execute(
+                        select(SecurityEvent).where(SecurityEvent.owner_id == row[0], SecurityEvent.timestamp >= since)
+                        .order_by(SecurityEvent.timestamp.desc()).limit(settings.ALERT_EMAIL_MAX_EVENTS)
+                    )).scalars().all()
+                    if events:
+                        total = (await db.execute(
+                            select(func.count()).select_from(SecurityEvent)
+                            .where(SecurityEvent.owner_id == row[0], SecurityEvent.timestamp >= since)
+                        )).scalar() or 0
+                        digests.append((row[1].strip().lower(), [AlertInfo.from_event(e) for e in events], total))
         hours = prefs.digest_interval_hours
-        if not alerts:
-            text = f"No security events were detected in the last {hours} hour(s)."
-            body = f"<html><body style='font-family:Arial'><h3>{_esc(settings.APP_NAME)} digest</h3><p>{text}</p></body></html>"
-        else:
+        for email, alerts, total in digests:
             text, body = render_alert_email(alerts, "digest")
-        try:
-            await send_email(recipients, f"[{settings.APP_NAME}] Security digest — {total} event(s) in {hours}h",
-                             text, body)
-        except EmailDeliveryError as exc:
-            self.last_error = str(exc)
-            logger.error(f"Digest email failed: {exc}")
+            try:
+                await send_email([email], f"[{settings.APP_NAME}] Security digest — {total} event(s) in {hours}h",
+                                 text, body)
+                self.emails_sent += 1
+            except EmailDeliveryError as exc:
+                self.last_error = str(exc)
+                logger.error(f"Digest email failed: {exc}")
 
 
 notifier = AlertNotifier()

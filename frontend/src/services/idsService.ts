@@ -63,6 +63,7 @@ export interface IDSStatus {
   packetsProcessed: number;
   flowsAnalyzed: number;
   activeFlows: number;
+  abnormalEventsToday: number;      // distinct abnormal episodes detected today
   anomaliesDetected: number;
   attacksDetected: number;
   blockedIps: number;

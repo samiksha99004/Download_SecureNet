@@ -91,7 +91,7 @@ class Settings(BaseSettings):
 
     # Alert emails: alerts are collected for this many seconds and sent as one
     # email per recipient (prevents an attack burst from flooding inboxes).
-    ALERT_EMAIL_BATCH_SECONDS: int = 30
+    ALERT_EMAIL_BATCH_SECONDS: int = 60   # wait ~1 min after abnormality starts before the first email (groups that minute's flags)
     # at most one attack email per this many seconds while the network stays abnormal
     ALERT_EMAIL_INTERVAL_SECONDS: int = 300
     ALERT_EMAIL_MAX_EVENTS: int = 50
@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # Extra IPs Protection must NEVER block (comma-separated), on top of this PC's own
     # addresses + loopback/link-local, which are always protected. Keeps the host safe.
     PROTECTION_NEVER_BLOCK: str = ""
+
+    # Only ONE account may be signed in at a time: a new sign-in (or sign-out) invalidates every
+    # other session's tokens, so other browsers are signed out automatically. Off in tests.
+    SINGLE_SESSION_ENFORCED: bool = True
 
     # Packet capture / flow assembly
     CAPTURE_SOURCE: str = "scapy"        # "scapy" (built-in) or "local_csv" (our CICFlowMeter-4.0 pipeline)

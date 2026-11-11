@@ -74,6 +74,11 @@ async def user_from_token(token: Optional[str], db: AsyncSession) -> Optional[Us
     payload = decode_token(token)
     if not payload:
         return None
+    # Single session: reject a token whose session was replaced by a newer sign-in (or a sign-out),
+    # so that browser is signed out automatically.
+    from app.services import active_session
+    if not active_session.is_valid(payload.get("sid")):
+        return None
     try:
         user_id = uuid.UUID(str(payload.get("sub")))
     except (TypeError, ValueError):

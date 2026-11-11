@@ -1,8 +1,9 @@
 /**
  * SecureNet — Reports Page
  *
- * Empty until an attack is detected. Then one box per day with attacks,
- * each with a download of that day's report (.txt or .pdf). The list
+ * Empty until an attack is detected. Then one box per 6-hour window (12am-6am,
+ * 6am-12pm, 12pm-6pm, 6pm-12am) that had attacks — created only after the window
+ * ends — each with a download of that window's report (.txt or .pdf). The list
  * refreshes by itself when a new attack arrives over the live connection.
  */
 
@@ -16,12 +17,12 @@ import { EmptyState } from '../components/common/EmptyState';
 import { DailyReportCard } from '../components/reports/DailyReportCard';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useWebSocketMessage } from '../hooks/useLiveMonitoring';
-import { getDailyReports } from '../services/reportsService';
+import { getWindowReports } from '../services/reportsService';
 import { errorMessage } from '../utils/errors';
 import styles from './ReportsPage.module.css';
 
 export function ReportsPage() {
-  const reports = useAsyncData(getDailyReports);
+  const reports = useAsyncData(getWindowReports);
   const { refetch } = reports;
   const onAlert = useCallback(() => { void refetch(); }, [refetch]);
   useWebSocketMessage('alert', onAlert);
@@ -31,7 +32,7 @@ export function ReportsPage() {
       <div className={styles.page}>
         <PageHeader
           title="Reports"
-          description="A report is created automatically for every day an attack is detected. Download it as .txt or .pdf."
+          description="A report is created for each 6-hour window (12am-6am, 6am-12pm, 12pm-6pm, 6pm-12am) that had attacks, once the window ends. Download it as .txt or .pdf."
         />
 
         {reports.isLoading && <LoadingState message="Loading reports…" />}
@@ -49,15 +50,15 @@ export function ReportsPage() {
             <EmptyState
               icon={<ShieldCheck size={28} />}
               title="No attacks detected"
-              description="Nothing has happened yet. When an attack is detected, that day's report appears here."
+              description="Nothing has happened yet. When attacks are detected, the report for that 6-hour window appears here after the window ends."
             />
           </div>
         )}
 
         {reports.data && reports.data.length > 0 && (
-          <section className={styles.grid} aria-label="Daily reports">
+          <section className={styles.grid} aria-label="Reports">
             {reports.data.map((report) => (
-              <DailyReportCard key={report.date} report={report} />
+              <DailyReportCard key={report.key} report={report} />
             ))}
           </section>
         )}

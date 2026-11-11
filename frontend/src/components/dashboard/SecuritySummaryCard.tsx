@@ -11,6 +11,7 @@ import { LoadingState } from '../common/LoadingState';
 import { ErrorState } from '../common/ErrorState';
 import { EmptyState } from '../common/EmptyState';
 import { IdsOffNote } from './IdsOffNote';
+import { prettyLabel } from '../../utils/verdict';
 import styles from './SecuritySummaryCard.module.css';
 
 interface SecuritySummaryCardProps {
@@ -130,7 +131,7 @@ export function SecuritySummaryCard({
               <ul className={styles.attackList} role="list">
                 {data.attackTypeDistribution.slice(0, 6).map((item) => (
                   <li key={item.attackType} className={styles.attackItem}>
-                    <span className={styles.attackType}>{item.attackType}</span>
+                    <span className={styles.attackType}>{prettyLabel(item.attackType)}</span>
                     <span className={styles.attackCount}>
                       {item.count.toLocaleString()}
                     </span>

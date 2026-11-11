@@ -23,7 +23,6 @@ export interface User {
   createdAt: string;      // ISO 8601
   lastLoginAt: string | null;
   avatarUrl: string | null;
-  phoneNumber: string | null;
   /** attack alert emails on/off for this account */
   emailAlerts: boolean;
 }
@@ -46,7 +45,6 @@ export interface LoginChallenge {
 export interface SignupRequest {
   fullName: string;
   email: string;
-  phoneNumber: string;
 }
 
 /** Registration step 3 — choose the password (after the code was verified). */
@@ -82,7 +80,6 @@ export interface OtpResendRequest {
 /** Change your own details; only fields that differ are changed. */
 export interface ProfileChangeRequest {
   fullName?: string;
-  phoneNumber?: string;
   email?: string;
 }
 

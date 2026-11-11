@@ -52,7 +52,6 @@ export function ProfileCard({ user }: ProfileCardProps) {
       <div className={styles.info}>
         <h3 className={styles.name}>{user.fullName}</h3>
         <p className={styles.email}>{user.email}</p>
-        {user.phoneNumber && <p className={styles.email}>{user.phoneNumber}</p>}
 
         <div className={styles.badges}>
           <span className={styles.roleBadge}>
