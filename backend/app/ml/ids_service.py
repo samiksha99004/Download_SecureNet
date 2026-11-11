@@ -100,6 +100,34 @@ def _save_active_owner(owner_id: Optional[str]) -> None:
         logger.warning(f"Could not persist active owner: {exc}")
 
 
+# ── "Incidents Today" counter (persisted) ─────────────────────────────────────
+# Stored next to the IDS state so the count survives a PC shutdown / backend restart: if the PC is
+# turned off at 4 incidents and back on the SAME local day, the dashboard still shows 4. It only
+# returns to 0 when the local calendar day changes (midnight). Format: "YYYY-MM-DD count".
+
+def _incidents_file():
+    return settings.ids_state_file.with_name("incidents-today.txt")
+
+
+def _load_incidents_today() -> tuple[Optional[str], int]:
+    try:
+        parts = _incidents_file().read_text(encoding="utf-8").strip().split()
+        if len(parts) == 2:
+            return parts[0], int(parts[1])
+    except (OSError, ValueError):
+        pass
+    return None, 0
+
+
+def _save_incidents_today(date: Optional[str], count: int) -> None:
+    try:
+        path = _incidents_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{date or ''} {count}", encoding="utf-8")
+    except OSError as exc:
+        logger.warning(f"Could not persist incidents-today count: {exc}")
+
+
 BENIGN_GUESS = "Benign"            # Table 2 row: stage 2 cancelled the alarm
 UNCLASSIFIED_GUESS = "Unclassified"
 # The behavioural rules (scan/sweep/brute/flood/ICMP) still run internally, but they are NOT shown
@@ -171,9 +199,10 @@ class IDSService:
         self.active_owner_id: Optional[str] = _load_active_owner()
         # "Today's abnormal count": number of distinct abnormal episodes detected today. Incremented
         # once each time the network goes normal -> abnormal (not while it stays abnormal); resets at
-        # midnight (local). Kept across IDS ON/OFF within the day (not reset by reset_verdicts).
-        self._abnormal_count = 0
-        self._abnormal_count_date: Optional[str] = None
+        # midnight (local). Kept across IDS ON/OFF within the day (not reset by reset_verdicts) and
+        # PERSISTED to disk, so a PC shutdown / backend restart on the same day restores the count
+        # (get_status still shows 0 once the local day has rolled over to a new date).
+        self._abnormal_count_date, self._abnormal_count = _load_incidents_today()
 
         self._queue: Optional[asyncio.Queue] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -646,10 +675,11 @@ class IDSService:
             self._abn_stored_this_episode = False
             # count this new abnormal episode towards today's total (slope went up again)
             today = time.strftime("%Y-%m-%d", time.localtime())
-            if self._abnormal_count_date != today:
+            if self._abnormal_count_date != today:   # new local day -> start at 0
                 self._abnormal_count_date = today
                 self._abnormal_count = 0
             self._abnormal_count += 1
+            _save_incidents_today(self._abnormal_count_date, self._abnormal_count)   # survive restart
         if first or (now - self._abn_last_desktop) >= DESKTOP_ALERT_INTERVAL:
             self._abn_last_desktop = now
             try:

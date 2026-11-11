@@ -82,11 +82,17 @@ def _reset_rate_limits():
 @pytest.fixture(autouse=True)
 def _reset_active_owner():
     """The IDS 'active owner' (who owns new detections) is process-wide and persisted; clear it
-    before each test so ownership never leaks between tests."""
-    from app.ml.ids_service import get_ids_service
-    get_ids_service().set_active_owner(None)
+    before each test so ownership never leaks between tests. Also clears the persisted
+    "Incidents Today" count/file so that counter starts clean in every test."""
+    from app.ml.ids_service import get_ids_service, _incidents_file
+    _incidents_file().unlink(missing_ok=True)
+    svc = get_ids_service()
+    svc.set_active_owner(None)
+    svc._abnormal_count = 0
+    svc._abnormal_count_date = None
     yield
     get_ids_service().set_active_owner(None)
+    _incidents_file().unlink(missing_ok=True)
 
 
 @pytest.fixture
