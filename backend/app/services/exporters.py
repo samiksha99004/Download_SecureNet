@@ -288,3 +288,178 @@ def to_pdf(events: Sequence[SecurityEvent], title: str, subtitle: str = "",
 
     doc.build(story, onFirstPage=_decorate, onLaterPages=_decorate)
     return buffer.getvalue()
+
+
+def report_to_pdf(events: Sequence[SecurityEvent], title: str, offset_minutes: int,
+                  period: Optional[str] = None, breakdown: Optional[Sequence[dict]] = None,
+                  abnormal_pct: Optional[float] = None) -> bytes:
+    """Styled A4 report PDF that mirrors incident_report.render_text section-for-section
+    (meta → SUMMARY → optional LIVE TRAFFIC BREAKDOWN → DETECTED ATTACKS). Same content as
+    the .txt download, laid out as clean branded cards instead of a raw table."""
+    from xml.sax.saxutils import escape
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (KeepTogether, Paragraph, SimpleDocTemplate,
+                                    Spacer, Table, TableStyle)
+
+    from app.services import incident_report as ir
+    from app.services.verdict import guesses_text, possible_attack, pretty_label
+    from app.utils.timeutil import utcnow
+
+    ordered = sorted(events, key=lambda e: e.timestamp)
+    tz = ir.tz_label(offset_minutes)
+    now_local = ir.to_local(utcnow(), offset_minutes).strftime("%d %b %Y, %H:%M:%S")
+    info = ir.summarize(ordered)
+    page_w, page_h = A4
+    content_w = page_w - 32 * mm
+
+    navy = colors.HexColor(_PDF_NAVY)
+    slate = colors.HexColor(_PDF_SLATE)
+    gray = colors.HexColor(_PDF_GRAY)
+    border = colors.HexColor(_PDF_BORDER)
+    light = colors.HexColor(_PDF_LIGHT)
+    ink = colors.HexColor("#0b1220")
+
+    def _decorate(canvas, doc):
+        canvas.saveState()
+        m = 8 * mm
+        canvas.setStrokeColor(navy); canvas.setLineWidth(1.6)
+        canvas.roundRect(m, m, page_w - 2 * m, page_h - 2 * m, 8, stroke=1, fill=0)
+        canvas.setStrokeColor(border); canvas.setLineWidth(0.6)
+        canvas.roundRect(m + 3, m + 3, page_w - 2 * m - 6, page_h - 2 * m - 6, 7, stroke=1, fill=0)
+        band_h = 16 * mm
+        bx, by, bw = m + 3, page_h - m - 3 - band_h, page_w - 2 * m - 6
+        canvas.setFillColor(navy)
+        canvas.roundRect(bx, by, bw, band_h, 7, stroke=0, fill=1)
+        canvas.rect(bx, by, bw, band_h / 2, stroke=0, fill=1)
+        _draw_shield(canvas, bx + 11 * mm, by + band_h / 2, 9 * mm)
+        canvas.setFillColor(colors.white); canvas.setFont("Helvetica-Bold", 15)
+        canvas.drawString(bx + 18 * mm, by + band_h / 2 - 1 * mm, "SecureNet Report")
+        canvas.setFillColor(colors.HexColor("#93c5fd")); canvas.setFont("Helvetica", 7.5)
+        canvas.drawString(bx + 18 * mm, by + band_h / 2 - 4.8 * mm, "Network Intrusion Detection System")
+        canvas.setFillColor(colors.HexColor("#cbd5e1")); canvas.setFont("Helvetica", 7.5)
+        canvas.drawRightString(bx + bw - 5 * mm, by + band_h / 2 - 2.5 * mm, f"Generated {now_local}")
+        fy = m + 4 * mm
+        canvas.setStrokeColor(border); canvas.setLineWidth(0.5)
+        canvas.line(m + 6, fy + 3.5 * mm, page_w - m - 6, fy + 3.5 * mm)
+        canvas.setFillColor(gray); canvas.setFont("Helvetica", 7.5)
+        canvas.drawString(m + 6, fy, "SecureNet - Behavioural Intrusion Detection System")
+        canvas.drawCentredString(page_w / 2, fy, "Confidential - for the account owner")
+        canvas.drawRightString(page_w - m - 6, fy, f"Page {doc.page}")
+        canvas.restoreState()
+
+    h1 = ParagraphStyle("rTitle", fontName="Helvetica-Bold", fontSize=15, textColor=navy, spaceAfter=1)
+    lbl = ParagraphStyle("rLbl", fontName="Helvetica-Bold", fontSize=8.5, textColor=slate, leading=12)
+    val = ParagraphStyle("rVal", fontName="Helvetica", fontSize=9, textColor=ink, leading=12)
+    note = ParagraphStyle("rNote", fontName="Helvetica-Oblique", fontSize=8, textColor=gray, leading=11)
+
+    def section(text: str):
+        t = Table([[text]], colWidths=[content_w])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), navy),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    def kv(pairs, lw=40 * mm):
+        rows = [[Paragraph(escape(k), lbl), Paragraph(escape(str(v)), val)] for k, v in pairs]
+        t = Table(rows, colWidths=[lw, content_w - lw])
+        t.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, border), ("INNERGRID", (0, 0), (-1, -1), 0.4, border),
+            ("BACKGROUND", (0, 0), (0, -1), light), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    story: List = [Paragraph(escape(title or "SecureNet Report"), h1)]
+    meta = [("Report", title)]
+    if period:
+        meta.append(("Period", f"{period} ({tz})"))
+    meta.append(("Generated", f"{now_local} ({tz})"))
+    mt = Table([[Paragraph(escape(k), lbl), Paragraph(escape(str(v)), val)] for k, v in meta],
+               colWidths=[26 * mm, content_w - 26 * mm])
+    mt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                            ("LEFTPADDING", (0, 0), (0, -1), 0),
+                            ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+    story += [mt, Spacer(1, 4 * mm)]
+
+    # SUMMARY
+    story += [section("SUMMARY"), Spacer(1, 1.5 * mm)]
+    story += [kv([
+        ("Flagged flows", info["total"]),
+        ("By severity", f"High {info['high']} | Medium {info['medium']} | Low {info['low']}"),
+        ("Attacks detected", ir._counts([pretty_label(ir._guess_name(e)) for e in ordered])),
+        ("Top addresses", ir._counts([e.source_ip for e in ordered])),
+        ("Between hosts", ir._counts([e.destination_ip for e in ordered])),
+    ]), Spacer(1, 4 * mm)]
+
+    # LIVE TRAFFIC BREAKDOWN (only when provided, same as render_text)
+    if breakdown:
+        story += [section("LIVE TRAFFIC BREAKDOWN (every class, even 0.1%)"), Spacer(1, 1.5 * mm)]
+        if abnormal_pct is not None:
+            story.append(Paragraph(f"Attacks were {abnormal_pct:.1f}% of recent traffic.", note))
+        brows = []
+        for r in breakdown:
+            raw = str(r.get("label", "?"))
+            pct = float(r.get("pct", 0.0))
+            tag = "" if raw.lower() in ("benign", "normal") else "attack"
+            brows.append([Paragraph(escape(pretty_label(raw)), val), f"{pct:5.1f}%", tag])
+        bt = Table(brows, colWidths=[content_w - 46 * mm, 18 * mm, 28 * mm])
+        bt.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, border), ("INNERGRID", (0, 0), (-1, -1), 0.3, border),
+            ("FONTNAME", (1, 0), (-1, -1), "Helvetica"), ("FONTSIZE", (1, 0), (-1, -1), 8.5),
+            ("TEXTCOLOR", (2, 0), (2, -1), colors.HexColor(_SEV_COLORS["high"])),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story += [bt, Spacer(1, 4 * mm)]
+
+    # DETECTED ATTACKS
+    story += [section("DETECTED ATTACKS"), Spacer(1, 2 * mm)]
+    if not ordered:
+        story.append(Paragraph("No abnormal traffic was detected in this period.", val))
+
+    for number, event in enumerate(ordered, start=1):
+        sev = event.severity.value
+        sev_color = colors.HexColor(_SEV_COLORS.get(sev, _PDF_SLATE))
+        head = Table([[f"#{number}   {ir._fmt_time(event.timestamp, offset_minutes)}", sev.upper()]],
+                     colWidths=[content_w - 30 * mm, 30 * mm])
+        head.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), slate), ("BACKGROUND", (1, 0), (1, 0), sev_color),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("ALIGN", (1, 0), (1, 0), "CENTER"), ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (0, 0), 8), ("TOPPADDING", (0, 0), (-1, 0), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
+        ]))
+        pairs = [("Attack", possible_attack(event.attack_type, event.confidence, event.attack_guesses))]
+        all_attacks = guesses_text(event.attack_guesses)
+        if all_attacks and all_attacks != "-":
+            pairs.append(("All attacks", all_attacks))
+        pairs += [
+            ("Severity", sev.upper()),
+            ("Source", f"{event.source_ip}:{event.source_port}"),
+            ("Destination", f"{event.destination_ip}:{event.destination_port} ({event.protocol.value})"),
+            ("Status", f"{event.state.value.replace('_', ' ')} | action: {event.action_taken.value}"),
+        ]
+        if event.detection_reason:
+            pairs.append(("Reason", event.detection_reason))
+        names = [f.get("name") for f in (event.contributing_features or [])
+                 if isinstance(f, dict) and f.get("name")]
+        if names:
+            pairs.append(("Unusual features", ", ".join(names)))
+        pairs.append(("Event ID", str(event.id)))
+        story.append(KeepTogether([head, kv(pairs), Spacer(1, 3.5 * mm)]))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm,
+                            topMargin=32 * mm, bottomMargin=16 * mm, title=title)
+    doc.build(story, onFirstPage=_decorate, onLaterPages=_decorate)
+    return buffer.getvalue()

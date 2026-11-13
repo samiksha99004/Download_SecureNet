@@ -131,8 +131,7 @@ async def download_window_report(
         text = await asyncio.to_thread(incident_report.render_text, events, title, tz_offset, period)
         content = text.encode("utf-8")
     else:
-        content = await asyncio.to_thread(exporters.to_pdf, events, title,
-                                          f"{period} · {len(events)} attack(s)")
+        content = await asyncio.to_thread(exporters.report_to_pdf, events, title, tz_offset, period)
     filename = incident_report.report_filename("report", key.replace(":", ""), format)
     return Response(content=content, media_type=REPORT_FORMATS[format],
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
