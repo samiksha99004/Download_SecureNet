@@ -350,7 +350,8 @@ def report_to_pdf(events: Sequence[SecurityEvent], title: str, offset_minutes: i
         canvas.drawRightString(page_w - m - 6, fy, f"Page {doc.page}")
         canvas.restoreState()
 
-    h1 = ParagraphStyle("rTitle", fontName="Helvetica-Bold", fontSize=15, textColor=navy, spaceAfter=1)
+    h1 = ParagraphStyle("rTitle", fontName="Helvetica-Bold", fontSize=15, textColor=navy,
+                        spaceBefore=6, spaceAfter=9, leading=19)
     lbl = ParagraphStyle("rLbl", fontName="Helvetica-Bold", fontSize=8.5, textColor=slate, leading=12)
     val = ParagraphStyle("rVal", fontName="Helvetica", fontSize=9, textColor=ink, leading=12)
     note = ParagraphStyle("rNote", fontName="Helvetica-Oblique", fontSize=8, textColor=gray, leading=11)
@@ -377,7 +378,7 @@ def report_to_pdf(events: Sequence[SecurityEvent], title: str, offset_minutes: i
         ]))
         return t
 
-    story: List = [Paragraph(escape(title or "SecureNet Report"), h1)]
+    story: List = [Paragraph(escape(title or "SecureNet Report"), h1), Spacer(1, 2.5 * mm)]
     meta = [("Report", title)]
     if period:
         meta.append(("Period", f"{period} ({tz})"))
@@ -386,8 +387,8 @@ def report_to_pdf(events: Sequence[SecurityEvent], title: str, offset_minutes: i
                colWidths=[26 * mm, content_w - 26 * mm])
     mt.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LEFTPADDING", (0, 0), (0, -1), 0),
-                            ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
-    story += [mt, Spacer(1, 4 * mm)]
+                            ("TOPPADDING", (0, 0), (-1, -1), 3.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5)]))
+    story += [mt, Spacer(1, 6 * mm)]
 
     # SUMMARY
     story += [section("SUMMARY"), Spacer(1, 1.5 * mm)]
@@ -460,6 +461,6 @@ def report_to_pdf(events: Sequence[SecurityEvent], title: str, offset_minutes: i
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm,
-                            topMargin=32 * mm, bottomMargin=16 * mm, title=title)
+                            topMargin=37 * mm, bottomMargin=16 * mm, title=title)
     doc.build(story, onFirstPage=_decorate, onLaterPages=_decorate)
     return buffer.getvalue()
